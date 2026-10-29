@@ -40,7 +40,7 @@
 
 ## 직접 설치하기
 
-이 저장소는 한 가족이 쓰도록 만든 앱이라, 가족 수와 계정 수는 두 명으로 고정돼 있습니다.
+이 저장소는 한 가족이 쓰도록 만든 앱이라, 가족 수와 계정 수는 두 명으로 고정돼 있습니다. 처음 설치하는 순서는 [설치 안내](docs/설치-안내.md)에 자세히 있습니다(Firebase 설정, 서버 함수 값, 캘린더 공유, APK 서명과 자동 빌드, 휴대폰 설치). 아래는 줄인 판입니다.
 
 1. Firebase 프로젝트를 만들고 Authentication(구글), Firestore, Functions를 켭니다. 서버 함수는 사용량 요금제(Blaze)가 필요합니다.
 2. `.firebaserc`의 프로젝트 이름을 바꾸고, 웹 설정값을 `.env.production`에 넣습니다(`VITE_FIREBASE_API_KEY` 등 7개, `src/firebase.ts`와 `src/pwa/push.ts` 참고).
@@ -53,7 +53,7 @@
    ```
    npm ci
    npm run build:web
-   npx firebase deploy --only functions,firestore:rules
+   npx firebase deploy --only functions,firestore
    ```
 
 시험 서버로 먼저 돌려 볼 수 있습니다. `npx firebase emulators:start --project demo-saltteul` 뒤에 `node scripts/seed.mjs`, `npm run dev`를 실행하고 husband@example.com 또는 wife@example.com으로 들어갑니다.
