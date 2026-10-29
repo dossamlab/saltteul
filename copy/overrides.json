@@ -1,0 +1,18 @@
+{
+  "auth.notAllowed": "{email} 계정은 살뜰 가족으로 등록되지 않았어요. 등록된 구글 계정으로 다시 로그인해 주세요.",
+  "auth.signIn": "구글 계정으로 로그인",
+  "anniv.kind.wedding": "결혼",
+  "brief.fb.annivToday": "{title}, 바로 오늘이에요",
+  "brief.fb.consumable": "{name}, {days}일 안에 떨어질 것 같아요",
+  "shop.suggestNow": "지금쯤 떨어졌을 것 같아요",
+  "settings.kidsnoteConnect": "연결하기",
+  "weather.rainFrom": "{time}부터 비 ({pop}%)",
+  "push.nudge.title": "{name}의 부탁",
+  "kidsnote.deadlineTitle": "{title} 마감",
+  "quick.errorBusy": "요청이 많아요. 조금 뒤 다시 해 주세요.",
+  "quick.fromFile": "사진·PDF로 넣기",
+  "push.briefing.titleMorning": "아침 브리핑이 도착했어요",
+  "push.briefing.titleEvening": "저녁 브리핑이 도착했어요",
+  "push.kidsnote.title": "알림장을 정리했어요",
+  "push.kidsnoteDown.body": "알림장을 가져오지 못했어요. 설정에서 키즈노트에 다시 로그인해 주세요"
+}

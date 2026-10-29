@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "saltteul-family",
+    "prod": "saltteul-family",
+    "demo": "demo-saltteul"
+  }
+}

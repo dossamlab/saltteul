@@ -1,0 +1,11 @@
+android
+functions
+tests
+reviews
+scripts/out
+copy/.cache
+*.md
+.firebase
+firestore-debug.log
+배포
+*.apk

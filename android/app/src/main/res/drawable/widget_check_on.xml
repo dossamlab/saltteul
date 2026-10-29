@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Checked checkbox: sage square with a white check. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#2D5A43"
+        android:pathData="M6,2h12a4,4 0,0 1,4 4v12a4,4 0,0 1,-4 4h-12a4,4 0,0 1,-4 -4v-12a4,4 0,0 1,4 -4z" />
+    <path
+        android:pathData="M7.5,12.5l3,3l6,-6.5"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

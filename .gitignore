@@ -1,0 +1,36 @@
+node_modules/
+dist/
+functions/lib/
+functions/node_modules/
+.firebase/
+*.log
+firebase-debug*.log
+firestore-debug.log
+ui-debug.log
+copy/.cache/
+test-results/
+playwright-report/
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/public/
+.env
+.env.*
+functions/.secret.local
+functions/.env.local
+scripts/out/
+public/fb/
+
+.vercel
+.env*
+배포/
+
+# Public repository: the family's own working notes and IRIS workspace files stay on this PC only
+작업상태.md
+실제연결안내.md
+2026-10-28-살뜰-*.md
+AGENTS.md
+CLAUDE.md
+# Built from the GOOGLE_SERVICES_JSON_BASE64 secret in CI; local builds keep their own copy
+android/app/google-services.json

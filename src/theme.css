@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+@font-face { font-family: 'Pretendard'; font-weight: 400; font-display: swap; src: url('./assets/fonts/Pretendard-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Pretendard'; font-weight: 500; font-display: swap; src: url('./assets/fonts/Pretendard-Medium.woff2') format('woff2'); }
+@font-face { font-family: 'Pretendard'; font-weight: 600; font-display: swap; src: url('./assets/fonts/Pretendard-SemiBold.woff2') format('woff2'); }
+@font-face { font-family: 'Pretendard'; font-weight: 700; font-display: swap; src: url('./assets/fonts/Pretendard-Bold.woff2') format('woff2'); }
+
+/* Warm Hearth Modern tokens (Stitch DESIGN.md) */
+@theme {
+  --font-sans: 'Pretendard', system-ui, sans-serif;
+
+  --color-canvas: #faf9f6;
+  --color-card: #ffffff;
+  --color-muted: #f4f2ec;
+  --color-line: #eae7df;
+  --color-ink: #232724;
+  --color-ink-2: #646c65;
+  --color-ink-3: #a7ada6;
+
+  --color-sage: #2d5a43;
+  --color-sage-2: #3e7b5c;
+  --color-sage-soft: #eaf2ed;
+  --color-terra: #e07a5f;
+  --color-terra-2: #9a442d;
+  --color-peach-soft: #fdf1ed;
+  --color-sand: #f4f2ec;
+  --color-wisteria: #7e6b8f;
+  --color-lavender: #d4c5e2;
+  --color-lavender-soft: #faf7fd;
+  --color-danger: #ba1a1a;
+
+  --radius-card: 1.5rem;
+  --radius-field: 0.75rem;
+
+  --shadow-card: 0 2px 8px -2px rgba(45, 90, 67, 0.04), 0 8px 16px -4px rgba(35, 39, 36, 0.03);
+  --shadow-sheet: 0 12px 32px -6px rgba(45, 90, 67, 0.08);
+  --shadow-ai: 0 0 16px 0 rgba(212, 197, 226, 0.35);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+button { cursor: pointer; }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+.ai-border {
+  background:
+    linear-gradient(var(--color-lavender-soft), var(--color-lavender-soft)) padding-box,
+    linear-gradient(135deg, rgba(126, 107, 143, 0.45), rgba(62, 123, 92, 0.45)) border-box;
+  border: 1.5px solid transparent;
+  box-shadow: var(--shadow-ai);
+}
+
+@keyframes strike { from { background-size: 0% 1.5px; } to { background-size: 100% 1.5px; } }
+.done-text {
+  display: inline;
+  color: var(--color-ink-3);
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 55%;
+  background-size: 100% 1.5px;
+  animation: strike 0.25s ease-out;
+}

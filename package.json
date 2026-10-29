@@ -1,0 +1,49 @@
+{
+  "name": "saltteul",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/copy-sw-libs.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/copy-sw-libs.mjs",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "build:web": "npm run build && node scripts/make-update-bundle.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-saltteul \"vitest run --config vitest.rules.config.ts\"",
+    "emulators": "firebase emulators:start --project demo-saltteul",
+    "seed": "node scripts/seed.mjs",
+    "copy:gen": "node copy/gen-copy.mjs",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@capacitor-firebase/authentication": "^8.5.2",
+    "@capacitor-firebase/messaging": "^8.5.2",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capgo/capacitor-updater": "8.53.0",
+    "firebase": "^13.1.0",
+    "lucide-react": "^1.62.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "fflate": "0.8.3",
+    "firebase-admin": "^14.5.0",
+    "firebase-tools": "^15.34.1",
+    "pretendard": "^1.3.9",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

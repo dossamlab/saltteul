@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Empty checkbox: rounded square outline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M7,3h10a4,4 0,0 1,4 4v10a4,4 0,0 1,-4 4h-10a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z"
+        android:strokeWidth="2"
+        android:strokeColor="#A7ADA6" />
+</vector>

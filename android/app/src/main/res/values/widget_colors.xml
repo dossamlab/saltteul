@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Warm Hearth palette for home-screen widgets (matches src/theme.css). -->
+<resources>
+    <color name="widget_canvas">#FAF9F6</color>
+    <color name="widget_card">#FFFFFF</color>
+    <color name="widget_line">#EAE7DF</color>
+    <color name="widget_ink">#232724</color>
+    <color name="widget_ink_2">#646C65</color>
+    <color name="widget_ink_3">#A7ADA6</color>
+    <color name="widget_sage">#2D5A43</color>
+    <color name="widget_sage_soft">#EAF2ED</color>
+    <color name="widget_terra">#E07A5F</color>
+    <color name="widget_peach_soft">#FDF1ED</color>
+    <color name="widget_wisteria">#7E6B8F</color>
+</resources>

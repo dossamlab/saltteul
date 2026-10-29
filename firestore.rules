@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Only the two members listed in households/{hid}.memberUids can read or write that household.
+// Membership, server-written results and secrets are written by Cloud Functions (Admin SDK) only.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isMember(hid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/households/$(hid))
+        && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.memberUids;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /households/{hid} {
+      allow read: if isMember(hid);
+      allow update: if isMember(hid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['memberUids', 'allowedEmails']);
+      allow create, delete: if false;
+
+      // Server-only collections: members can read results, never write.
+      match /{coll}/{docId} {
+        allow read: if isMember(hid) && coll != 'secrets';
+        allow write: if isMember(hid)
+          && !(coll in ['secrets', 'integrations', 'briefings', 'kidsnote', 'journal', 'dinner']);
+      }
+    }
+  }
+}
