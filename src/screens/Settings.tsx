@@ -2,6 +2,7 @@ import { Bell, CalendarDays, Check, CloudSun, LogOut, RefreshCw, School, Sparkle
 import { useState, type ReactNode } from 'react'
 import type { IntegrationState } from '../../shared/types'
 import { logOut } from '../auth/session'
+import { KidsnoteHistoryButton } from '../components/KidsnoteHistory'
 import { LocationCard } from '../components/LocationCard'
 import { Button, Card, CardHeader, Field, Pill } from '../components/ui'
 import { t } from '../copy'
@@ -172,6 +173,7 @@ export function SettingsScreen({ wide = false }: { wide?: boolean }) {
             <Button variant="soft" disabled={!kn.id.trim() || !kn.pw || kn.busy} onClick={connect}>{t('settings.kidsnoteConnect')}</Button>
             {kn.msg && <p className="text-[13px] text-ink-2">{kn.msg}</p>}
             <KidsnoteClassPicker state={state('kidsnote')} />
+            <KidsnoteHistoryButton variant="soft" />
           </div>
         </Card>
 

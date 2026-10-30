@@ -7,10 +7,10 @@ export type Job =
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 export const DINNER_HOUR = 15
 /**
- * Kids Note reads, KST: 07:00 just before the 07:30 briefing, 19:00 before the 20:00 one, and three in between for
- * newsletters and the afternoon reports. 「지금 가져오기」 in settings still reads on demand.
+ * Kids Note reads, KST: on the hour from 07:00 (before the 07:30 briefing) to 22:00, so late-evening posts still land
+ * the same night. Claude only reads new posts, so the number of reads does not change Claude usage.
  */
-export const KIDSNOTE_HOURS = [7, 10, 13, 16, 19] as const
+export const KIDSNOTE_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] as const
 
 /** KST hour, the quarter-hour slot (0/15/30/45) the tick belongs to, and the weekday (0 = Sunday); tolerates a late trigger. */
 export function kstSlot(now: Date): { hour: number; quarter: number; weekday: number } {

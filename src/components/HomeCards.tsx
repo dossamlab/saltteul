@@ -9,6 +9,7 @@ import { addShopping, undoKidsnoteBatch } from '../data/actions'
 import { missingIngredients } from '../data/pure'
 import { useHousehold } from '../data/store'
 import { dDayLabel, formatDay, relativeDay } from '../format'
+import { KidsnoteHistoryButton } from './KidsnoteHistory'
 import { Button, Card, CardHeader, Empty, Pill } from './ui'
 
 const SLOT_KEY: Record<Briefing['slot'], string> = { morning: 'brief.morning', evening: 'brief.evening', weekly: 'brief.weekly' }
@@ -202,11 +203,16 @@ export function KidsnoteCard({ className = '' }: { className?: string }) {
   const lastBatch = items.find((x) => x.kidsnoteBatchId)?.kidsnoteBatchId
   return (
     <Card className={className}>
-      <CardHeader title={t('kidsnote.cardTitle')} action={lastBatch && (
-        <button type="button" className="flex items-center gap-1 text-[12px] font-semibold text-ink-2" onClick={() => undoKidsnoteBatch(lastBatch)}>
-          <Undo2 size={14} />
-          {t('kidsnote.undoLast')}
-        </button>
+      <CardHeader title={t('kidsnote.cardTitle')} action={(
+        <div className="flex items-center gap-3">
+          {lastBatch && (
+            <button type="button" className="flex items-center gap-1 text-[12px] font-semibold text-ink-2" onClick={() => undoKidsnoteBatch(lastBatch)}>
+              <Undo2 size={14} />
+              {t('kidsnote.undoLast')}
+            </button>
+          )}
+          <KidsnoteHistoryButton />
+        </div>
       )} />
       {items.length === 0 && <Empty>{t('kidsnote.empty')}</Empty>}
       {items.map((x) => (
