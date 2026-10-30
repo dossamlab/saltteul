@@ -187,7 +187,7 @@ describe('notices', () => {
       attachments: [{ kind: 'image', urls: ['https://kidsnote.s3.amazonaws.com/l/9.jpg'], name: null }],
       classId: null,
     })
-    expect(parseNotice({ id: 2, created: '2026-10-26T00:00:00Z', title: 't', content: '', cls: 1120471 })?.classId).toBe('1120471')
+    expect(parseNotice({ id: 2, created: '2026-10-26T00:00:00Z', title: 't', content: '', cls: 5551234 })?.classId).toBe('5551234')
     expect(parseNotice({ id: 3, created: '2026-10-26T00:00:00Z', title: 't', content: '', cls: { id: 77, name: 'x' } })?.classId).toBe('77')
     expect(parseNotice({ id: 1, created: '2026-10-26T00:00:00Z', title: 'Only a title', content: '' })?.text).toBe('Only a title')
     expect(parseNotice({ title: 'no id' })).toBeNull()
