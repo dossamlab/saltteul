@@ -310,7 +310,7 @@
     { "key": "settings.calendarHint", "where": "작은 글씨", "meaning": "「우리집」 캘린더 설정의 캘린더 ID를 붙여 넣으면 날짜 있는 할 일이 오간다", "maxChars": 50 },
     { "key": "settings.calendarId", "where": "입력칸 라벨", "meaning": "캘린더 ID", "maxChars": 8 },
     { "key": "settings.kidsnote", "where": "카드 제목", "meaning": "키즈노트 연결", "maxChars": 8 },
-    { "key": "settings.kidsnoteHint", "where": "작은 글씨", "meaning": "한 번 로그인하면 알림장을 매시간 확인해 일정과 준비물을 넣어 준다. 비밀번호는 저장하지 않는다", "maxChars": 60 },
+    {"key": "settings.kidsnoteHint", "where": "작은 글씨", "meaning": "한 번 로그인하면 알림장과 공지사항을 하루 다섯 번 확인해 일정과 준비물을 넣어 준다. 비밀번호는 저장하지 않는다", "maxChars": 60, "fixed": "알림장과 공지사항을 하루 다섯 번 살펴 일정과 준비물을 챙겨 드려요. 비밀번호는 저장하지 않아요."},
     { "key": "settings.kidsnoteId", "where": "입력칸 라벨", "meaning": "키즈노트 아이디", "maxChars": 10 },
     { "key": "settings.kidsnotePw", "where": "입력칸 라벨", "meaning": "키즈노트 비밀번호", "maxChars": 10 },
     { "key": "settings.kidsnoteConnect", "where": "버튼", "meaning": "키즈노트 연결하기", "maxChars": 10 },
@@ -370,6 +370,11 @@
     {"key": "menu.date", "where": "식단표 확인 창 날짜 칸 설명", "meaning": "날짜", "fixed": "날짜"},
     {"key": "menu.addDay", "where": "식단표 확인 창 버튼", "meaning": "하루 더 넣기", "fixed": "하루 추가"},
     {"key": "menu.readFailed", "where": "식단표 읽기 오류", "meaning": "식단표를 읽지 못했다. 잠시 뒤 다시", "fixed": "식단표를 읽지 못했어요. 잠시 뒤 다시 해 주세요"},
-    {"key": "menu.saveFailed", "where": "식단표 저장 오류", "meaning": "저장하지 못했다. 연결을 확인하고 다시", "fixed": "저장하지 못했어요. 연결을 확인하고 다시 해 주세요"}
+    {"key": "menu.saveFailed", "where": "식단표 저장 오류", "meaning": "저장하지 못했다. 연결을 확인하고 다시", "fixed": "저장하지 못했어요. 연결을 확인하고 다시 해 주세요"},
+    {"key": "settings.kidsnoteClass", "where": "설정 키즈노트 칸의 반 선택 이름", "meaning": "아이 반", "fixed": "아이 반"},
+    {"key": "settings.kidsnoteClassAuto", "where": "반 선택의 첫 항목(키즈노트에 등록된 반을 따름)", "meaning": "키즈노트에 등록된 반({name})을 그대로 쓴다", "fixed": "키즈노트 등록대로 ({name})", "vars": ["name"]},
+    {"key": "settings.kidsnoteClassAutoUnknown", "where": "반 선택의 첫 항목(등록된 반을 모를 때)", "meaning": "키즈노트에 등록된 반을 그대로 쓴다", "fixed": "키즈노트 등록대로"},
+    {"key": "settings.kidsnoteClassHint", "where": "반 선택 아래 작은 글씨", "meaning": "공지사항에서는 이 반과 전체 대상 내용만 넣고 다른 반 소식은 건너뛴다", "fixed": "공지사항에서는 이 반과 전체 대상 내용만 할 일에 넣어요. 다른 반 소식은 건너뛰어요."},
+    {"key": "settings.kidsnoteClassNone", "where": "반 목록이 아직 없을 때 안내", "meaning": "키즈노트를 연결하고 지금 가져오기를 누르면 반 목록이 나온다", "fixed": "키즈노트를 연결한 뒤 아래 「지금 가져오기」를 누르면 반 목록이 나와요."}
   ]
 }

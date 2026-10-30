@@ -139,6 +139,14 @@ export interface Settings {
   briefingTimes: { morning: string; evening: string }
   calendarId?: string | null
   weather?: { updatedAt: number; days: WeatherDay[] } | null
+  /** The child's Kids Note class chosen in settings; null/absent = the class Kids Note has on record. */
+  kidsnoteClassId?: string | null
+}
+
+/** One class of the daycare as Kids Note lists it. */
+export interface KidsnoteClass {
+  id: string
+  name: string
 }
 
 /**
@@ -215,4 +223,7 @@ export interface IntegrationState {
   lastSuccessAt?: number | null
   consecutiveFailures: number
   lastError?: string | null
+  /** kidsnote only: the daycare's classes and the child's class on record, refreshed by each poll. */
+  classes?: KidsnoteClass[]
+  detectedClassId?: string | null
 }

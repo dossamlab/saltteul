@@ -106,6 +106,54 @@ describe('center notices', () => {
     expect(db.read(KIDSNOTE_SECRET_PATH)?.noticesPolledAt).toBeUndefined()
   })
 
+  it('tells Claude the child\'s class on record, saves the class list, and skips notices posted to another class', async () => {
+    const { db, kidsnote, claude, deps } = fakes()
+    kidsnote.classInfo = { classes: [{ id: '11', name: 'Sun' }, { id: '12', name: 'Moon' }, { id: '13', name: 'Star' }], childClassId: '12' }
+    kidsnote.notices.push({ id: 'n2', written: W, createdAt: '2026-10-28T00:40:00.000Z', text: 'Sun class trip', url: null, classId: '11' })
+    expect(await pollKidsnote(deps, NOW)).toMatchObject({ processed: 2, batches: ['kn-notice-n1'] })
+    expect(claude.extractCalls).toHaveLength(1)
+    expect(claude.extractCalls[0].audience).toEqual({ myClass: 'Moon', otherClasses: ['Sun', 'Star'] })
+    expect(db.read(`${H}/kidsnote/notice-n2`)).toMatchObject({ skipped: 'otherClass', classId: '11', todoIds: [] })
+    expect(db.read(`${H}/integrations/kidsnote`)).toMatchObject({ classes: kidsnote.classInfo.classes, detectedClassId: '12' })
+  })
+
+  it('uses the class chosen in settings over the one on record', async () => {
+    const { db, kidsnote, claude, deps } = fakes()
+    db.put(`${H}/settings/main`, { familyName: '', kidsnoteClassId: '11' })
+    kidsnote.classInfo = { classes: [{ id: '11', name: 'Sun' }, { id: '12', name: 'Moon' }], childClassId: '12' }
+    kidsnote.notices.push({ id: 'n2', written: W, createdAt: '2026-10-28T00:40:00.000Z', text: 'Sun class trip', url: null, classId: '11' })
+    await pollKidsnote(deps, NOW)
+    expect(claude.extractCalls.map((c) => c.audience?.myClass)).toEqual(['Sun', 'Sun'])
+  })
+
+  it('reads notices without a class filter when the class list cannot be read', async () => {
+    const { kidsnote, claude, deps } = fakes()
+    kidsnote.classInfo = new Error('kidsnote HTTP 500')
+    expect(await pollKidsnote(deps, NOW)).toMatchObject({ processed: 1 })
+    expect(claude.extractCalls[0].audience).toBeUndefined()
+  })
+
+  it('reads the class list once after connecting even without new notices', async () => {
+    const { db, kidsnote, deps } = fakes()
+    kidsnote.notices = []
+    kidsnote.classInfo = { classes: [{ id: '12', name: 'Moon' }], childClassId: '12' }
+    expect(await pollKidsnote(deps, NOW)).toMatchObject({ processed: 0 })
+    expect(db.read(`${H}/integrations/kidsnote`)).toMatchObject({ classes: [{ id: '12', name: 'Moon' }], detectedClassId: '12' })
+  })
+
+  it('stops after the list when nothing is new', async () => {
+    const { db, kidsnote, claude, deps } = fakes()
+    kidsnote.classInfo = { classes: [{ id: '12', name: 'Moon' }], childClassId: '12' }
+    await pollKidsnote(deps, NOW)
+    let classReads = 0
+    kidsnote.getClassInfo = async () => (classReads++, { classes: [], childClassId: null })
+    const later = new Date(NOW.getTime() + 3 * 3600_000)
+    expect(await pollKidsnote(deps, later)).toEqual({ status: 'ok', processed: 0, batches: [] })
+    expect(classReads).toBe(0)
+    expect(claude.extractCalls).toHaveLength(1)
+    expect(db.read(KIDSNOTE_SECRET_PATH)).toMatchObject({ lastPolledAt: later.toISOString(), noticesPolledAt: later.toISOString() })
+  })
+
   it('leaves notices out of the growth journal', async () => {
     const { db, claude, deps } = fakes()
     db.put(`${H}/kidsnote/r1`, { kind: 'report', reportId: 'r1', written: W, text: 'Played with sand' })

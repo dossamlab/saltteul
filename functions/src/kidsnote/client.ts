@@ -1,5 +1,5 @@
 import { seoulDate } from '../../../shared/householdDate'
-import type { Ymd } from '../../../shared/types'
+import type { KidsnoteClass, Ymd } from '../../../shared/types'
 
 /*
  * Kids Note has no public API. The web app (www.kidsnote.com, Next.js) logs in with
@@ -70,6 +70,14 @@ export interface KidsnoteReport {
   text: string
   url: string | null
   attachments?: KidsnoteAttachmentRef[]
+  /** Notices only: the class it was posted to, null for a center-wide notice. */
+  classId?: string | null
+}
+
+/** The daycare's classes and the class the child is enrolled in, as Kids Note has them on record. */
+export interface KidsnoteClassInfo {
+  classes: KidsnoteClass[]
+  childClassId: string | null
 }
 
 export interface DownloadedFile {
@@ -90,6 +98,8 @@ export interface KidsnotePort {
   download(tokens: KidsnoteTokens, url: string, maxBytes: number): Promise<DownloadedFile>
   /** Center notices created at or after `sinceIso`, oldest first. */
   listNotices(tokens: KidsnoteTokens, centerId: string, sinceIso: string): Promise<KidsnoteReport[]>
+  /** Classes of the center and the child's enrolled class. */
+  getClassInfo(tokens: KidsnoteTokens, centerId: string, childId: string): Promise<KidsnoteClassInfo>
 }
 
 type FetchFn = typeof fetch
@@ -237,7 +247,24 @@ export function parseNotice(r: Json): KidsnoteReport | null {
   if (!base) return null
   const title = typeof r.title === 'string' ? r.title.trim() : ''
   const text = title && !base.text.startsWith(title) ? `${title}\n${base.text}`.trim() : base.text
-  return { ...base, text, url: `https://www.kidsnote.com/notice/${encodeURIComponent(base.id)}` }
+  // `cls` was null on every notice seen so far (2026-10-30, 100 center-wide notices); a class notice is assumed to carry
+  // the class id as a number, a string or {id}.
+  const classId = idString(r.cls) ?? idString(asObj(r.cls)?.id)
+  return { ...base, text, url: `https://www.kidsnote.com/notice/${encodeURIComponent(base.id)}`, classId }
+}
+
+/**
+ * GET /v1/centers/{id}/ lists `classes` ({id, name, ...}); the child's `enrollment[]` (GET /v1_2/children/{id}/) has
+ * `center_id` and `belong_to_class` (both verified 2026-10-30 with a parent session).
+ */
+export function parseClassInfo(center: unknown, child: unknown, centerId: string): KidsnoteClassInfo {
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
+  const classes = list(asObj(center)?.classes)
+    .map((c) => ({ id: idString(asObj(c)?.id), name: String(asObj(c)?.name ?? '').trim() }))
+    .filter((c): c is KidsnoteClass => !!c.id && !!c.name)
+  const enrollments = list(asObj(child)?.enrollment).map(asObj).filter((e): e is Json => !!e)
+  const mine = enrollments.find((e) => idString(e.center_id) === centerId) ?? enrollments[0]
+  return { classes, childClassId: mine ? idString(mine.belong_to_class) : null }
 }
 
 /** `next` is either a URL with ?page= or, as the live API sends it (2026-10-29), a bare cursor such as "cD03MzQ4Nzk5Mg==". */
@@ -297,6 +324,14 @@ export class HttpKidsnote implements KidsnotePort {
 
   async listNotices(tokens: KidsnoteTokens, centerId: string, sinceIso: string): Promise<KidsnoteReport[]> {
     return this.listSince(tokens, KIDSNOTE_API.noticesPath(centerId), {}, parseNotice, sinceIso)
+  }
+
+  async getClassInfo(tokens: KidsnoteTokens, centerId: string, childId: string): Promise<KidsnoteClassInfo> {
+    const [center, child] = await Promise.all([
+      this.get(tokens, `/v1/centers/${encodeURIComponent(centerId)}/`),
+      this.get(tokens, `/v1_2/children/${encodeURIComponent(childId)}/`),
+    ])
+    return parseClassInfo(center, child, centerId)
   }
 
   /** Newest-first list endpoint → items created at or after `sinceIso`, oldest first. */
@@ -369,6 +404,11 @@ export class FakeKidsnote implements KidsnotePort {
   notices: KidsnoteReport[] = []
   noticeCalls: string[] = []
   noticesFailWith: Error | null = null
+  classInfo: KidsnoteClassInfo | Error = { classes: [], childClassId: null }
+  async getClassInfo() {
+    if (this.classInfo instanceof Error) throw this.classInfo
+    return this.classInfo
+  }
 
   async download(_t: KidsnoteTokens, url: string, maxBytes: number) {
     this.downloads.push(url)

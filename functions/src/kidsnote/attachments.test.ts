@@ -5,7 +5,7 @@ import { FakeFirestore } from '../testing/fakeFirestore'
 import { FakeMessaging } from '../testing/fakeMessaging'
 import { ATTACHMENT_LIMITS, downloadAttachments } from './attachments'
 import {
-  collectAttachments, FakeKidsnote, HttpKidsnote, parseChildren, parseNotice, parseReport, sniffMediaType, type KidsnoteTokens,
+  collectAttachments, FakeKidsnote, HttpKidsnote, parseChildren, parseClassInfo, parseNotice, parseReport, sniffMediaType, type KidsnoteTokens,
 } from './client'
 import { KIDSNOTE_SECRET_PATH } from './connect'
 import { pollKidsnote } from './poll'
@@ -185,9 +185,19 @@ describe('notices', () => {
       id: '73524733', written: '2026-10-26', createdAt: '2026-10-26T08:23:47.000Z',
       text: 'Field trip helpers\nPlease sign up by 11/3.', url: 'https://www.kidsnote.com/notice/73524733',
       attachments: [{ kind: 'image', urls: ['https://kidsnote.s3.amazonaws.com/l/9.jpg'], name: null }],
+      classId: null,
     })
+    expect(parseNotice({ id: 2, created: '2026-10-26T00:00:00Z', title: 't', content: '', cls: 1120471 })?.classId).toBe('1120471')
+    expect(parseNotice({ id: 3, created: '2026-10-26T00:00:00Z', title: 't', content: '', cls: { id: 77, name: 'x' } })?.classId).toBe('77')
     expect(parseNotice({ id: 1, created: '2026-10-26T00:00:00Z', title: 'Only a title', content: '' })?.text).toBe('Only a title')
     expect(parseNotice({ title: 'no id' })).toBeNull()
+  })
+
+  it('reads the class list and the child\'s enrolled class', () => {
+    const center = { id: 501, classes: [{ id: 11, name: 'Sun' }, { id: 12, name: 'Moon ' }, { id: 13, name: '' }, { name: 'no id' }] }
+    const child = { id: 9, enrollment: [{ center_id: 400, belong_to_class: 99 }, { center_id: 501, belong_to_class: 12 }] }
+    expect(parseClassInfo(center, child, '501')).toEqual({ classes: [{ id: '11', name: 'Sun' }, { id: '12', name: 'Moon' }], childClassId: '12' })
+    expect(parseClassInfo({}, {}, '501')).toEqual({ classes: [], childClassId: null })
   })
 
   it('pages the center notices with the cursor and stops at older items', async () => {

@@ -6,6 +6,11 @@ export type Job =
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 export const DINNER_HOUR = 15
+/**
+ * Kids Note reads, KST: 07:00 just before the 07:30 briefing, 19:00 before the 20:00 one, and three in between for
+ * newsletters and the afternoon reports. 「지금 가져오기」 in settings still reads on demand.
+ */
+export const KIDSNOTE_HOURS = [7, 10, 13, 16, 19] as const
 
 /** KST hour, the quarter-hour slot (0/15/30/45) the tick belongs to, and the weekday (0 = Sunday); tolerates a late trigger. */
 export function kstSlot(now: Date): { hour: number; quarter: number; weekday: number } {
@@ -25,7 +30,7 @@ export function dueJobs(now: Date): Job[] {
   const { hour, quarter, weekday } = kstSlot(now)
   const jobs: Job[] = ['calendar']
   if (quarter === 15) jobs.push('weather')
-  if (quarter === 0 && hour >= 6 && hour <= 22) jobs.push('kidsnote')
+  if (quarter === 0 && (KIDSNOTE_HOURS as readonly number[]).includes(hour)) jobs.push('kidsnote')
   if (hour === 7 && quarter === 30) jobs.push('morningBriefing')
   if (hour === DINNER_HOUR && quarter === 0 && isWeekday(weekday)) jobs.push('dinner')
   if (hour === 20 && quarter === 0) {

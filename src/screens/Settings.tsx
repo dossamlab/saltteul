@@ -54,6 +54,33 @@ function SaveButton({ dirty, onSave }: { dirty: boolean; onSave: () => Promise<u
   )
 }
 
+/**
+ * The child's class for center notices. "" follows the class Kids Note has on record; the list comes from the server's
+ * last Kids Note read (integrations/kidsnote).
+ */
+function KidsnoteClassPicker({ state }: { state?: IntegrationState }) {
+  const h = useHousehold()
+  const saved = h.settings.kidsnoteClassId ?? ''
+  const [value, setValue] = useState(saved)
+  const classes = state?.classes ?? []
+  if (!classes.length) return <p className="text-[12px] text-ink-2">{t('settings.kidsnoteClassNone')}</p>
+  const detected = classes.find((c) => c.id === state?.detectedClassId)?.name
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[13px] font-semibold text-ink-2">{t('settings.kidsnoteClass')}</span>
+        <select value={value} onChange={(e) => setValue(e.target.value)}
+          className="h-12 w-full rounded-[var(--radius-field)] border border-sand bg-white px-3 text-[15px] text-ink outline-none focus:border-sage focus:ring-[1.5px] focus:ring-sage">
+          <option value="">{detected ? t('settings.kidsnoteClassAuto', { name: detected }) : t('settings.kidsnoteClassAutoUnknown')}</option>
+          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <p className="text-[12px] text-ink-2">{t('settings.kidsnoteClassHint')}</p>
+      <SaveButton dirty={value !== saved} onSave={() => updateSettings(h.hid, { kidsnoteClassId: value || null })} />
+    </div>
+  )
+}
+
 export function SettingsScreen({ wide = false }: { wide?: boolean }) {
   const h = useHousehold()
   const [myName, setMyName] = useState(h.me?.displayName ?? '')
@@ -144,6 +171,7 @@ export function SettingsScreen({ wide = false }: { wide?: boolean }) {
             <Field label={t('settings.kidsnotePw')} type="password" autoComplete="off" value={kn.pw} onChange={(e) => setKn({ ...kn, pw: e.target.value })} />
             <Button variant="soft" disabled={!kn.id.trim() || !kn.pw || kn.busy} onClick={connect}>{t('settings.kidsnoteConnect')}</Button>
             {kn.msg && <p className="text-[13px] text-ink-2">{kn.msg}</p>}
+            <KidsnoteClassPicker state={state('kidsnote')} />
           </div>
         </Card>
 

@@ -23,6 +23,8 @@ export interface KidsnoteReportInput {
   ruleKeywords: string[]
   /** Photos / PDFs attached to the notice, or a newsletter file uploaded by a member. */
   attachments?: Attachment[]
+  /** Center notices only: the child's class and the other classes, so items meant only for other classes are left out. */
+  audience?: { myClass: string; otherClasses: string[] }
 }
 
 type WithModel<T> = T & { model: string }
@@ -67,6 +69,10 @@ export const EXTRACT_SYSTEM = `당신은 어린이집·유치원 알림장(키�
     needsPurchase는 새로 사야 할 가능성이 큰 소모성 물건(예: 견학용 우비, 행사용 흰 티셔츠)일 때만 true.
 - deadlines: 회신·제출·납부 마감(예: 「동의서 제출」). dateText·isoDate 규칙은 events와 같습니다.
 - notes: 날짜는 없지만 부모가 알아야 할 짧은 안내(한 줄씩, 최대 3개).
+- audience가 있으면 어린이집 전체 공지입니다. myClass는 우리 아이의 반, otherClasses는 같은 어린이집의 다른 반입니다.
+  - 일정·준비물·마감이 특정 반만 대상이면(예: 「열매반 현장학습」) myClass가 그 대상에 들어갈 때만 넣습니다(예: 「해님, 달님반 견학」은 달님반에 해당).
+  - 반을 말하지 않거나 전체·모든 반·전 원아 대상이면 넣습니다. 나이(만 2세 등)로만 대상을 말하면 반을 알 수 없으니 넣습니다.
+  - 다른 반만 대상이라 뺀 내용은 notes에도 넣지 않습니다.
 - 본문에 없는 내용을 지어내지 않습니다. 해당 항목이 없으면 빈 배열로 둡니다.`
 
 export const QUICK_ADD_SYSTEM = `당신은 부부가 함께 쓰는 살림 앱 「살뜰」의 빠른 입력 도우미입니다.
@@ -215,7 +221,10 @@ export class AnthropicClaude implements ClaudePort {
   }
 
   async extractKidsnote(report: KidsnoteReportInput) {
-    const json = JSON.stringify({ written: report.written, ruleKeywords: report.ruleKeywords, text: report.text })
+    const json = JSON.stringify({
+      written: report.written, ruleKeywords: report.ruleKeywords, text: report.text,
+      ...(report.audience ? { audience: report.audience } : {}),
+    })
     const files = attachmentBlocks(report.attachments)
     const { parsed, model } = await this.callJson(
       EXTRACT_SYSTEM,

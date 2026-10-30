@@ -13,15 +13,14 @@ describe('dueJobs', () => {
   it('fetches weather at quarter past every hour', () => {
     expect(dueJobs(kst(13, 15))).toEqual(['calendar', 'weather'])
   })
-  it('polls kids note on the hour between 06 and 22', () => {
-    expect(dueJobs(kst(6, 0))).toContain('kidsnote')
-    expect(dueJobs(kst(22, 0))).toContain('kidsnote')
-    expect(dueJobs(kst(23, 0))).not.toContain('kidsnote')
-    expect(dueJobs(kst(5, 0))).not.toContain('kidsnote')
+  it('reads kids note five times a day: 07, 10, 13, 16 and 19 KST', () => {
+    const hours = Array.from({ length: 24 }, (_, h) => h).filter((h) => dueJobs(kst(h, 0)).includes('kidsnote'))
+    expect(hours).toEqual([7, 10, 13, 16, 19])
+    expect(dueJobs(kst(19, 15))).not.toContain('kidsnote')
   })
   it('sends briefings at 07:30 and 20:00', () => {
     expect(dueJobs(kst(7, 30))).toEqual(['calendar', 'morningBriefing'])
-    expect(dueJobs(kst(20, 0))).toEqual(['calendar', 'kidsnote', 'eveningBriefing'])
+    expect(dueJobs(kst(20, 0))).toEqual(['calendar', 'eveningBriefing'])
   })
   it('tolerates a trigger that fires a few minutes late', () => {
     expect(dueJobs(kst(7, 33))).toContain('morningBriefing')
@@ -29,13 +28,13 @@ describe('dueJobs', () => {
     expect(dueJobs(kst(7, 45))).not.toContain('morningBriefing')
   })
   it('replaces the Sunday evening briefing with the weekly preview and the growth journal', () => {
-    expect(dueJobs(sunday(20, 0))).toEqual(['calendar', 'kidsnote', 'weeklyPreview', 'journal'])
+    expect(dueJobs(sunday(20, 0))).toEqual(['calendar', 'weeklyPreview', 'journal'])
     expect(dueJobs(sunday(20, 14))).toContain('journal')
-    expect(dueJobs(saturday(20, 0))).toEqual(['calendar', 'kidsnote', 'eveningBriefing'])
+    expect(dueJobs(saturday(20, 0))).toEqual(['calendar', 'eveningBriefing'])
     expect(dueJobs(sunday(7, 30))).toEqual(['calendar', 'morningBriefing'])
   })
   it('suggests dinner at 15:00 on weekdays only', () => {
-    expect(dueJobs(kst(15, 0))).toEqual(['calendar', 'kidsnote', 'dinner'])
+    expect(dueJobs(kst(15, 0))).toEqual(['calendar', 'dinner'])
     expect(dueJobs(kst(15, 15))).not.toContain('dinner')
     expect(dueJobs(saturday(15, 0))).not.toContain('dinner')
     expect(dueJobs(sunday(15, 0))).not.toContain('dinner')
