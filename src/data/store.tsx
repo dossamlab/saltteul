@@ -2,8 +2,8 @@ import { collection, doc, limit, onSnapshot, orderBy, query, where, type Query }
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { addDays, householdDate } from '../../shared/householdDate'
 import type {
-  Anniversary, Briefing, Chore, Consumable, DinnerSuggestion, IntegrationState, JournalEntry, Member, Nudge, Owner, PantryItem,
-  PrepRule, Routine, RoutineLog, Settings, ShoppingItem, Todo, Ymd,
+  Anniversary, Briefing, Chore, Consumable, DayMenu, DinnerSuggestion, IntegrationState, JournalEntry, Member, Nudge, Owner, PantryItem,
+  MonthlyMenu, PrepRule, Routine, RoutineLog, Settings, ShoppingItem, Todo, Ymd,
 } from '../../shared/types'
 import { useReadySession } from '../auth/session'
 import { t } from '../copy'
@@ -32,6 +32,8 @@ export interface HouseholdData {
   journal: JournalEntry[]
   /** Today's dinner suggestions (doc id = household date), null until the server writes it. */
   dinner: DinnerSuggestion | null
+  /** Today's daycare menu from the uploaded monthly sheet, null when no sheet covers today. */
+  todayMenu: DayMenu | null
   settings: Settings
   nameOf: (uidOrOwner: string | Owner) => string
   me: Member | undefined
@@ -88,6 +90,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [integrations] = useList<IntegrationState>(c('integrations'), [hid])
   const [journal] = useList<JournalEntry>(query(c('journal'), orderBy('weekStart', 'desc'), limit(12)), [hid])
   const [dinner, setDinner] = useState<DinnerSuggestion | null>(null)
+  const [todayMenu, setTodayMenu] = useState<DayMenu | null>(null)
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS)
   const [l5, setL5] = useState(false)
 
@@ -106,6 +109,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     [base, today],
   )
 
+  useEffect(
+    () => onSnapshot(doc(db, `${base}/menus/${today.slice(0, 7)}`), (d) => {
+      setTodayMenu((d.exists() ? (d.data() as MonthlyMenu).days?.[today] : null) ?? null)
+    }, () => setTodayMenu(null)),
+    [base, today],
+  )
+
   const value = useMemo<HouseholdData>(() => {
     const me = members.find((m) => m.uid === user.uid)
     const partner = members.find((m) => m.uid !== user.uid)
@@ -118,10 +128,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return {
       loaded: l1 && l2 && l3 && l4 && l5,
       hid, uid: user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables,
-      pantry, prepRules, briefings, nudges, integrations, journal, dinner, settings, nameOf, me, partner,
+      pantry, prepRules, briefings, nudges, integrations, journal, dinner, todayMenu, settings, nameOf, me, partner,
     }
   }, [hid, user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables, pantry, prepRules,
-    briefings, nudges, integrations, journal, dinner, settings, l1, l2, l3, l4, l5])
+    briefings, nudges, integrations, journal, dinner, todayMenu, settings, l1, l2, l3, l4, l5])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

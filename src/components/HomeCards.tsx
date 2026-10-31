@@ -1,5 +1,6 @@
 import {
-  Cake, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, Loader2, ShoppingBasket, Sparkles, Sun, Undo2, UtensilsCrossed,
+  Cake, ChevronDown, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, Loader2, ShoppingBasket, Sparkles, Sun, Undo2,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { useState } from 'react'
 import { togetherDays, upcoming } from '../../shared/anniversaries'
@@ -165,31 +166,44 @@ function DinnerOptionRow({ option }: { option: DinnerOption }) {
   )
 }
 
-/** Tonight's dinner: options that avoid what the child ate at daycare, with one-tap ingredient adding. */
+/**
+ * Today's daycare meals (from the uploaded monthly sheet) shown first; the dinner ideas that avoid them stay folded
+ * until opened.
+ */
 export function DinnerCard({ className = '' }: { className?: string }) {
   const h = useHousehold()
+  const [open, setOpen] = useState(false)
   const d = h.dinner
-  const menu = d?.daycareMenu
+  const m = h.todayMenu
+  // The sheet is the source; the copy kept on the dinner doc covers a sheet deleted after 15:00.
+  const rows: [string, string[]][] = m
+    ? [['menu.lunch', m.lunch], ['menu.morningSnack', m.morningSnack], ['menu.afternoonSnack', m.afternoonSnack]]
+    : d?.daycareMenu ? [['dinner.daycareLunch', d.daycareMenu.lunch], ['dinner.daycareSnack', d.daycareMenu.snack]] : []
+  const shown = rows.filter(([, items]) => items?.length)
+  const options = d?.options.slice(0, 3) ?? []
   return (
     <Card className={className}>
-      <CardHeader title={t('dinner.title')} icon={<UtensilsCrossed size={17} className="text-terra" />} />
-      {!d || d.options.length === 0 ? <Empty>{t('dinner.empty')}</Empty> : (
-        <>
-          {menu && (menu.lunch.length > 0 || menu.snack.length > 0) && (
-            <div className="mb-1 rounded-[var(--radius-field)] bg-muted px-3.5 py-2.5 text-[13px] leading-relaxed">
-              {menu.lunch.length > 0 && (
-                <p><span className="mr-2 font-semibold text-wisteria">{t('dinner.daycareLunch')}</span><span className="text-ink-2">{menu.lunch.join(', ')}</span></p>
-              )}
-              {menu.snack.length > 0 && (
-                <p><span className="mr-2 font-semibold text-wisteria">{t('dinner.daycareSnack')}</span><span className="text-ink-2">{menu.snack.join(', ')}</span></p>
-              )}
-            </div>
-          )}
-          <div className="divide-y divide-line">
-            {d.options.slice(0, 3).map((o) => <DinnerOptionRow key={o.name} option={o} />)}
-          </div>
-        </>
-      )}
+      <CardHeader title={t('dinner.cardTitle')} icon={<UtensilsCrossed size={17} className="text-terra" />} />
+      {shown.length ? (
+        <div className="flex flex-col gap-1.5 text-[14px] leading-relaxed">
+          {shown.map(([key, items]) => (
+            <p key={key}>
+              <span className="mr-2 inline-block min-w-[4.5rem] font-semibold text-wisteria">{t(key)}</span>
+              <span className="text-ink">{items.join(', ')}</span>
+            </p>
+          ))}
+        </div>
+      ) : <Empty>{t('dinner.noMenu')}</Empty>}
+      <div className="mt-3 border-t border-line pt-2">
+        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}
+          className="flex w-full items-center gap-2 py-1.5 text-left text-[14px] font-semibold text-ink-2">
+          <span className="flex-1">{options.length ? t('dinner.suggestToggle', { n: options.length }) : t('dinner.title')}</span>
+          <ChevronDown size={18} className={`text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {open && (options.length
+          ? <div className="divide-y divide-line">{options.map((o) => <DinnerOptionRow key={o.name} option={o} />)}</div>
+          : <p className="py-2 text-[13px] text-ink-2">{t('dinner.empty')}</p>)}
+      </div>
     </Card>
   )
 }

@@ -440,6 +440,9 @@
     {"key": "widget.pantryMinus", "where": "위젯 −1 버튼 설명", "meaning": "하나 썼다", "fixed": "하나 쓰기"},
     {"key": "widget.pantryQty", "where": "위젯 수량 표시", "meaning": "{qty}{unit}", "fixed": "{qty}{unit}", "vars": ["qty", "unit"]},
     {"key": "widget.pantryExpirySoon", "where": "위젯 유통기한 임박 표시", "meaning": "기한 {days}일", "fixed": "기한 {days}일", "vars": ["days"]},
-    {"key": "widget.pantryExpired", "where": "위젯 유통기한 지남 표시", "meaning": "유통기한이 지남", "fixed": "기한 지남"}
+    {"key": "widget.pantryExpired", "where": "위젯 유통기한 지남 표시", "meaning": "유통기한이 지남", "fixed": "기한 지남"},
+    {"key": "dinner.cardTitle", "where": "홈의 식단 카드 제목", "meaning": "오늘 어린이집에서 먹는 식단", "fixed": "오늘 어린이집 식단"},
+    {"key": "dinner.noMenu", "where": "홈 식단 카드(오늘 식단이 없을 때)", "meaning": "오늘 식단이 없다. 우리 집 탭에서 이달 식단표를 올리라", "fixed": "오늘 식단이 없어요. 「우리 집」에서 이달 식단표를 올려 주세요."},
+    {"key": "dinner.suggestToggle", "where": "홈 식단 카드 아래 접힌 저녁 메뉴 추천 버튼", "meaning": "저녁 메뉴 추천 {n}가지 펼치기", "fixed": "저녁 메뉴 추천 {n}가지", "vars": ["n"]}
   ]
 }
