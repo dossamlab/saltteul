@@ -4,7 +4,9 @@ import { createPortal } from 'react-dom'
 import { isRoutineDone } from '../../shared/routines'
 import type { QuickAddResult, QuickItem } from '../../shared/types'
 import { t } from '../copy'
-import { addShopping, addTodo, extractFromFile, markChoreDone, quickAdd, toggleRoutine } from '../data/actions'
+import {
+  addPantryItem, addShopping, addTodo, applyPantryOps, extractFromFile, markChoreDone, quickAdd, toggleRoutine,
+} from '../data/actions'
 import { useHousehold, type HouseholdData } from '../data/store'
 import { prepareUpload, UploadError } from '../data/upload'
 import { relativeDay, timeLabel } from '../format'
@@ -29,6 +31,9 @@ function errorMessage(e: unknown): string {
 
 /** Writes the kept items with the regular actions. Returns how many were written. */
 async function applyItems(h: HouseholdData, items: QuickItem[]): Promise<number> {
+  // Pantry changes go in order in one batch, each from the count the previous one left.
+  const pantryOps = items.flatMap((it) => (it.kind === 'pantry' ? [{ pantryId: it.pantryId, op: it.op, amount: it.amount }] : []))
+  const pantryWrite = pantryOps.length ? applyPantryOps(h.hid, h.uid, h.pantry, pantryOps, 'voice') : Promise.resolve(0)
   const writes = items.map(async (it) => {
     switch (it.kind) {
       case 'todo':
@@ -48,17 +53,24 @@ async function applyItems(h: HouseholdData, items: QuickItem[]): Promise<number>
         if (chore.lastDone !== h.today) await markChoreDone(h.hid, chore, h.today, h.uid)
         return 1
       }
+      case 'pantry':
+        return 0 // counted with pantryWrite
+      case 'pantryNew':
+        await addPantryItem(h.hid, h.uid, { name: it.name, unit: it.unit, qty: it.qty, minQty: 1, restockQty: 0 })
+        return 1
     }
   })
-  return (await Promise.all(writes)).reduce<number>((a, b) => a + b, 0)
+  const done = await Promise.all([...writes, pantryWrite])
+  return done.reduce<number>((a, b) => a + (b ?? 0), 0)
 }
 
 const KIND_KEY: Record<QuickItem['kind'], string> = {
   todo: 'quick.kind.todo', shopping: 'quick.kind.shopping', routineDone: 'quick.kind.routine', choreDone: 'quick.kind.chore',
+  pantry: 'quick.kind.pantry', pantryNew: 'quick.kind.pantry',
 }
 
 function itemLabel(it: QuickItem) {
-  return it.kind === 'shopping' ? it.name : it.title
+  return it.kind === 'shopping' || it.kind === 'pantry' || it.kind === 'pantryNew' ? it.name : it.title
 }
 
 function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolean; onToggle: () => void }) {
@@ -72,7 +84,7 @@ function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolea
           {item.kind === 'shopping' && item.qty && <span className="ml-1.5 text-[13px] text-ink-2">{item.qty}</span>}
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2">
-          <Pill tone={item.kind === 'shopping' ? 'terra' : item.kind === 'todo' ? 'muted' : 'sage'}>{t(KIND_KEY[item.kind])}</Pill>
+          <Pill tone={item.kind === 'shopping' ? 'terra' : item.kind === 'todo' ? 'muted' : item.kind === 'pantry' || item.kind === 'pantryNew' ? 'ai' : 'sage'}>{t(KIND_KEY[item.kind])}</Pill>
           {item.kind === 'todo' && (
             <>
               <span>{item.date ? relativeDay(item.date, h.today) : t('quick.noDate')}</span>
@@ -81,6 +93,10 @@ function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolea
             </>
           )}
           {(item.kind === 'routineDone' || item.kind === 'choreDone') && <span>{t('quick.markDone')}</span>}
+          {item.kind === 'pantry' && (
+            <span>{t('quick.pantryChange', { before: `${item.before}${item.unit}`, after: `${item.after}${item.unit}` })}</span>
+          )}
+          {item.kind === 'pantryNew' && <span>{t('quick.pantryNew', { qty: `${item.qty}${item.unit}` })}</span>}
           {item.kind === 'shopping' && item.note && <span>{item.note}</span>}
         </div>
         {item.kind === 'todo' && item.note && <p className="mt-1 text-[13px] text-ink-2">{item.note}</p>}

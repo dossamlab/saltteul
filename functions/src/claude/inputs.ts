@@ -27,6 +27,8 @@ export interface QuickAddInput {
   routines: { id: string; title: string; owner: Owner; doneToday: boolean }[]
   chores: { id: string; title: string; owner: Owner }[]
   openShopping: string[]
+  /** Pantry items (상비품) with their current count */
+  pantry: { id: string; name: string; unit: string; qty: number; aliases: string[] }[]
   text: string
 }
 

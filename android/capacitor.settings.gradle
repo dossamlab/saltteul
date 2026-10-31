@@ -7,3 +7,6 @@ project(':capacitor-firebase-authentication').projectDir = new File('C:/IRIS/R04
 
 include ':capacitor-firebase-messaging'
 project(':capacitor-firebase-messaging').projectDir = new File('C:/IRIS/R04-가정(Home)/D01-가정 관리(Household Management)/P01-살뜰(Saltteul) 〖App〗〖Web〗/node_modules/@capacitor-firebase/messaging/android')
+
+include ':capgo-capacitor-updater'
+project(':capgo-capacitor-updater').projectDir = new File('C:/IRIS/R04-가정(Home)/D01-가정 관리(Household Management)/P01-살뜰(Saltteul) 〖App〗〖Web〗/node_modules/@capgo/capacitor-updater/android')

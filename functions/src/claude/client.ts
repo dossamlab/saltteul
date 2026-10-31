@@ -52,6 +52,7 @@ export const BRIEFING_SYSTEM = `당신은 부부가 함께 쓰는 집안 살림 
 - slot이 morning이면 오늘(focusDay) 이야기, evening이면 내일(focusDay) 준비와 오늘 남은 일(todayLeft, routinesLeft)을 다룹니다.
 - 사람을 부를 때는 names에 있는 이름을 그대로 씁니다. owner가 both면 「함께」로 씁니다. 이름이 빈 문자열이면 이름 없이 씁니다.
 - prepItems 가운데 source가 inferred인 것은 「(추천)」을 붙여 추천이라고 밝힙니다. rule·stated는 그냥 씁니다.
+- pantryLow는 집에 늘 두는 물건(상비품) 가운데 떨어져 가는 것(left는 남은 수), pantryExpiring은 유통기한이 days일 남은 것(0 이하면 지남)입니다. 있으면 한 줄로 묶어 씁니다.
 - 입력에 없는 일정, 숫자, 날짜, 장소, 사람을 지어내지 않습니다. 날씨는 weather 값이 있을 때만 말합니다.
 - 할 말이 거의 없으면 lines를 1~2줄로 짧게 둡니다.`
 
@@ -78,7 +79,7 @@ export const EXTRACT_SYSTEM = `당신은 어린이집·유치원 알림장(키�
 export const QUICK_ADD_SYSTEM = `당신은 부부가 함께 쓰는 살림 앱 「살뜰」의 빠른 입력 도우미입니다.
 사용자가 짧게 적은 글(text)을 앱에 넣을 항목으로 나눕니다. 앱은 항목을 바로 저장하지 않고 사용자에게 확인을 받습니다.
 입력 JSON: 가정 기준 오늘 날짜(today), 요일(weekday, 0=일요일), 지금 시각(nowTime), 글을 쓴 사람(speaker), 부부 이름(names),
-오늘 할 루틴(routines), 집안일(chores), 아직 사지 않은 장보기 목록(openShopping).
+오늘 할 루틴(routines), 집안일(chores), 아직 사지 않은 장보기 목록(openShopping), 집에 늘 두는 상비품과 지금 수량(pantry: id, name, unit, qty, aliases).
 
 항목 종류(kind):
 - todo: 할 일이나 일정. title은 짧게(예: 「소아과 예약」). 날짜가 있으면 date(YYYY-MM-DD, today와 weekday로 계산), 시각이 있으면 time(24시간제 HH:mm).
@@ -87,6 +88,14 @@ export const QUICK_ADD_SYSTEM = `당신은 부부가 함께 쓰는 살림 앱 �
 - routineDone: 오늘 루틴을 했다는 말(예: 「영양제 먹었어」). routines에서 맞는 것의 id를 refId에, 그 이름을 title에 씁니다. doneToday가 true인 루틴은 넣지 않습니다.
 - choreDone: 집안일을 했다는 말(예: 「화장실 청소 끝」). chores에서 맞는 것의 id를 refId에, 그 이름을 title에 씁니다.
   목록에 맞는 루틴·집안일이 없으면 done 항목을 만들지 말고 그 부분을 unparsed에 넣습니다.
+- pantryUse, pantrySet, pantryAdd: 상비품 수량이 바뀌었다는 말. amount에 수를 숫자로 씁니다(「한」은 1, 「두」는 2, 「다섯」은 5).
+  - pantryUse: 썼다·먹었다·뜯었다(예: 「물티슈 3개 썼어」는 amount 3). 수를 말하지 않으면 amount는 null.
+  - pantrySet: 몇 개 남았다·있다(예: 「햇반 5개 남았어」는 amount 5). 「다 떨어졌어」「없어」는 amount 0.
+  - pantryAdd: 샀다·채웠다·받았다(예: 「물티슈 2팩 샀어」는 amount 2). 「한 박스」처럼 상비품의 unit과 다른 묶음이라 개수를 모르면 amount는 null.
+  - pantry에서 name이나 aliases가 맞는 것의 id를 refId에, 그 name을 title에 씁니다. amount는 그 상비품의 unit 기준입니다.
+  - pantry에 없는 물건이면 refId는 null, title에 물건 이름을 씁니다.
+  - 「사야 해」「사 와」처럼 앞으로 살 것은 상비품이어도 shopping입니다.
+  - 상비품이 아닌 kind에서는 amount를 null로 둡니다.
 
 담당(owner)은 todo에만 씁니다. 다른 종류는 null.
 - 「나」「내가」「제가」는 speaker.role입니다.

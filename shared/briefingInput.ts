@@ -2,9 +2,10 @@ import { remindersForToday, togetherDays, type UpcomingAnniversary } from './ann
 import { choreStatus, sortChores, type ChoreStatus } from './chores'
 import { dueSoon } from './consumables'
 import { addDays, householdDate } from './householdDate'
+import { daysToExpiry, expiresSoon, isLow, qtyLabel, sortPantry } from './pantry'
 import { isRoutineDone, routinesForDay } from './routines'
 import type {
-  Anniversary, Chore, Consumable, Member, Owner, PrepItem, Routine, RoutineLog, Settings, ShoppingItem, Todo, WeatherDay, Ymd,
+  Anniversary, Chore, Consumable, Member, Owner, PantryItem, PrepItem, Routine, RoutineLog, Settings, ShoppingItem, Todo, WeatherDay, Ymd,
 } from './types'
 
 export interface HouseholdSnapshot {
@@ -16,6 +17,8 @@ export interface HouseholdSnapshot {
   chores: Chore[]
   anniversaries: Anniversary[]
   consumables: Consumable[]
+  /** Pantry (상비품); optional so older snapshots and tests stay valid. */
+  pantry?: PantryItem[]
   settings: Settings
 }
 
@@ -41,6 +44,10 @@ export interface BriefingInput {
   anniversaries: UpcomingAnniversary[]
   togetherDays: number | null
   consumablesDue: { name: string; daysLeft: number }[]
+  /** Pantry items at or below their minimum, with the count left (e.g. "2팩"). */
+  pantryLow: { name: string; left: string }[]
+  /** morning only: pantry items whose expiry is within 7 days (days < 0 = past). */
+  pantryExpiring: { name: string; days: number }[]
   shoppingLeft: string[]
 }
 
@@ -88,6 +95,11 @@ export function buildBriefingInput(s: HouseholdSnapshot, now: Date, slot: 'morni
     anniversaries: remindersForToday(s.anniversaries, focusDay),
     togetherDays: together ? togetherDays(together.date, day) : null,
     consumablesDue: dueSoon(s.consumables, day, 5).map((c) => ({ name: c.name, daysLeft: c.daysLeft })),
+    pantryLow: sortPantry(s.pantry ?? [], day).filter(isLow).map((p) => ({ name: p.name, left: qtyLabel(p) })),
+    pantryExpiring:
+      slot === 'morning'
+        ? sortPantry(s.pantry ?? [], day).filter((p) => expiresSoon(p, day)).map((p) => ({ name: p.name, days: daysToExpiry(p, day)! }))
+        : [],
     shoppingLeft: s.shopping.filter((i) => !i.bought).map((i) => i.name),
   }
 }
@@ -96,6 +108,7 @@ export function buildBriefingInput(s: HouseholdSnapshot, now: Date, slot: 'morni
 export function isEmptyBriefing(i: BriefingInput): boolean {
   return (
     i.focusTodos.length === 0 && i.todayLeft.length === 0 && i.routinesLeft.length === 0 &&
-    i.chores.length === 0 && i.anniversaries.length === 0 && i.consumablesDue.length === 0 && !i.weather
+    i.chores.length === 0 && i.anniversaries.length === 0 && i.consumablesDue.length === 0 &&
+    i.pantryLow.length === 0 && i.pantryExpiring.length === 0 && !i.weather
   )
 }

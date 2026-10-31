@@ -156,7 +156,7 @@ export function validateExtraction(v: unknown): KidsnoteExtraction {
 
 // ── Quick add ───────────────────────────────────────────────────────────────
 
-export const QUICK_KINDS = ['todo', 'shopping', 'routineDone', 'choreDone'] as const
+export const QUICK_KINDS = ['todo', 'shopping', 'routineDone', 'choreDone', 'pantryUse', 'pantrySet', 'pantryAdd'] as const
 export type QuickKind = (typeof QUICK_KINDS)[number]
 export const OWNERS = ['husband', 'wife', 'both'] as const
 
@@ -170,9 +170,11 @@ export interface RawQuickItem {
   owner: string | null
   note: string | null
   qty: string | null
-  /** routine id or chore id for the done kinds */
+  /** routine id or chore id for the done kinds; pantry item id for the pantry kinds (null for an unknown item) */
   refId: string | null
   prepItems: string[]
+  /** pantry kinds: how many, in the item's unit; null when not said (use → 1, add → the usual purchase amount) */
+  amount: number | null
 }
 
 export interface RawQuickAdd {
@@ -197,8 +199,9 @@ export const quickAddSchema = {
           qty: nullableString,
           refId: nullableString,
           prepItems: { type: 'array', items: { type: 'string' } },
+          amount: { anyOf: [{ type: 'number' }, { type: 'null' }] },
         },
-        required: ['kind', 'title', 'date', 'time', 'owner', 'note', 'qty', 'refId', 'prepItems'],
+        required: ['kind', 'title', 'date', 'time', 'owner', 'note', 'qty', 'refId', 'prepItems', 'amount'],
         additionalProperties: false,
       },
     },
@@ -225,6 +228,7 @@ export function validateQuickAddRaw(v: unknown): RawQuickAdd {
       qty: s(it.qty),
       refId: s(it.refId),
       prepItems: Array.isArray(it.prepItems) ? it.prepItems.map(s).filter((x): x is string => !!x) : [],
+      amount: typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount >= 0 ? it.amount : null,
     })
   }
   const unparsed = arr(v.unparsed ?? [], 'unparsed')

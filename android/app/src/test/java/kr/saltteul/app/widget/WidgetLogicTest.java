@@ -228,6 +228,217 @@ public class WidgetLogicTest {
                 WidgetLogic.purchasesAfterBuy(Arrays.asList("2026-09-01", "2026-10-28"), "2026-10-28", false));
     }
 
+    // ---------- pantry (shared/pantry.ts) ----------
+
+    private static Snapshot.Pantry pantry(String id, String name, int qty, double minQty, String expiry) {
+        return new Snapshot.Pantry(id, name, "pack", qty, minQty, expiry);
+    }
+
+    private static List<String> pantryIds(List<Snapshot.Pantry> ps) {
+        List<String> out = new ArrayList<>();
+        for (Snapshot.Pantry p : ps) out.add(p.id);
+        return out;
+    }
+
+    @Test
+    public void pantry_isLowAtOrBelowMin() {
+        assertTrue(WidgetLogic.isLow(pantry("a", "a", 2, 2, null)));
+        assertTrue(WidgetLogic.isLow(pantry("a", "a", 0, 0, null)));
+        assertFalse(WidgetLogic.isLow(pantry("a", "a", 3, 2, null)));
+    }
+
+    @Test
+    public void pantry_expiresSoonWithinSevenDaysOrPast() {
+        String today = "2026-10-28";
+        assertEquals(Integer.valueOf(7), WidgetLogic.daysToExpiry(pantry("a", "a", 5, 1, "2026-11-04"), today));
+        assertTrue(WidgetLogic.expiresSoon(pantry("a", "a", 5, 1, "2026-11-04"), today)); // 7 days
+        assertFalse(WidgetLogic.expiresSoon(pantry("a", "a", 5, 1, "2026-11-05"), today)); // 8 days
+        assertTrue(WidgetLogic.expiresSoon(pantry("a", "a", 5, 1, "2026-10-28"), today)); // today
+        assertTrue(WidgetLogic.expiresSoon(pantry("a", "a", 5, 1, "2026-10-20"), today)); // past
+        assertEquals(Integer.valueOf(-8), WidgetLogic.daysToExpiry(pantry("a", "a", 5, 1, "2026-10-20"), today));
+        assertNull(WidgetLogic.daysToExpiry(pantry("a", "a", 5, 1, null), today));
+        assertFalse(WidgetLogic.expiresSoon(pantry("a", "a", 5, 1, null), today));
+    }
+
+    @Test
+    public void pantry_expiredOnlyAfterTheDate() {
+        String today = "2026-10-28";
+        assertTrue(WidgetLogic.isExpired(pantry("a", "a", 5, 1, "2026-10-27"), today));
+        assertFalse(WidgetLogic.isExpired(pantry("a", "a", 5, 1, "2026-10-28"), today)); // today: 0 days
+        assertFalse(WidgetLogic.isExpired(pantry("a", "a", 5, 1, "2026-11-04"), today));
+        assertFalse(WidgetLogic.isExpired(pantry("a", "a", 5, 1, null), today));
+
+        Snapshot s = new Snapshot();
+        s.pantry.add(new Snapshot.Pantry("past", "a", "", 5, 1, "2026-10-20"));
+        s.pantry.add(new Snapshot.Pantry("today", "b", "", 5, 1, "2026-10-28"));
+        s.pantry.add(new Snapshot.Pantry("week", "c", "", 5, 1, "2026-11-04"));
+        List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_PANTRY, today);
+        assertEquals("past", rows.get(0).id);
+        assertTrue(rows.get(0).expired);
+        assertEquals("today", rows.get(1).id);
+        assertFalse(rows.get(1).expired);
+        assertEquals(Integer.valueOf(0), rows.get(1).expiryDays);
+        assertFalse(rows.get(2).expired);
+        assertEquals(Integer.valueOf(7), rows.get(2).expiryDays);
+        // The tablet section uses the same rows.
+        for (WidgetLogic.Row r : WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, today)) {
+            if ("past".equals(r.id)) assertTrue(r.expired);
+        }
+    }
+
+    @Test
+    public void pantry_expiryUsesHouseholdDay() {
+        // 2026-11-05 02:00 KST is still household day 11-04, so an 11-11 expiry is 7 days away.
+        String day = WidgetLogic.householdDate(at("2026-11-04T17:00:00Z"));
+        assertEquals("2026-11-04", day);
+        assertTrue(WidgetLogic.expiresSoon(pantry("a", "a", 5, 1, "2026-11-11"), day));
+    }
+
+    @Test
+    public void pantry_sortLowThenExpiringThenKoreanName() {
+        String today = "2026-10-28";
+        List<Snapshot.Pantry> list = Arrays.asList(
+                pantry("water", "물", 10, 2, null),               // mul: ok
+                pantry("rice", "햇반", 1, 2, null),           // haetban: low
+                pantry("milk", "우유", 4, 1, "2026-10-30"),   // uyu: expiring
+                pantry("ramen", "라면", 0, 1, "2026-10-29"),  // ramyeon: low and expiring -> low rank
+                pantry("egg", "계란", 10, 2, "2026-12-01"),   // gyeran: ok
+                pantry("tissue", "가제품", 3, 1, null)); // ok, sorts first by name
+        assertEquals(Arrays.asList("ramen", "rice", "milk", "tissue", "egg", "water"),
+                pantryIds(WidgetLogic.sortPantry(list, today)));
+    }
+
+    @Test
+    public void pantry_afterUseNeverBelowZero() {
+        assertEquals(2, WidgetLogic.pantryAfterUse(3));
+        assertEquals(0, WidgetLogic.pantryAfterUse(1));
+        assertEquals(0, WidgetLogic.pantryAfterUse(0));
+    }
+
+    @Test
+    public void pantry_shoppingTickAddsAndUntickTakesBack() {
+        assertEquals(12, WidgetLogic.pantryAmount(12));
+        assertEquals(3, WidgetLogic.pantryAmount(2.6));
+        assertEquals(0, WidgetLogic.pantryAmount(-1));
+        // bought: 'buy' adds restockQty
+        assertEquals(14, WidgetLogic.pantryAfterShopping(2, 12, true));
+        assertEquals(12, WidgetLogic.pantryAfterShopping(0, 12, true));
+        // unticked: 'use' takes it back off, never below zero
+        assertEquals(2, WidgetLogic.pantryAfterShopping(14, 12, false));
+        assertEquals(0, WidgetLogic.pantryAfterShopping(5, 12, false));
+    }
+
+    @Test
+    public void shopping_pantryIdRoundTripsToRow() {
+        Snapshot s = sample();
+        s.shopping.get(0).pantryId = "p1";
+        Snapshot r = Snapshot.fromJson(s.toJson());
+        assertNotNull(r);
+        assertEquals("p1", r.shopping.get(0).pantryId);
+        assertNull(r.shopping.get(1).pantryId);
+        assertEquals(s.toJson(), r.toJson());
+        for (WidgetLogic.Row row : WidgetLogic.buildRows(r, WidgetLogic.KIND_TABLET, "2026-10-28")) {
+            if ("s2".equals(row.id)) assertEquals("p1", row.pantryId);
+            if ("s1".equals(row.id)) assertNull(row.pantryId);
+        }
+    }
+
+    @Test
+    public void pantry_unitDefaultsToGae() {
+        assertEquals("개", WidgetLogic.pantryUnit(null));
+        assertEquals("개", WidgetLogic.pantryUnit("  "));
+        assertEquals("pack", WidgetLogic.pantryUnit(" pack "));
+    }
+
+    @Test
+    public void pantry_optimisticUseStopsAtZero() {
+        Snapshot s = sample();
+        s.pantry.add(pantry("p1", "p1", 1, 0, null));
+        assertTrue(WidgetLogic.applyPantryUse(s, "p1"));
+        assertEquals(0, s.pantry.get(0).qty);
+        assertFalse(WidgetLogic.applyPantryUse(s, "p1"));
+        assertEquals(0, s.pantry.get(0).qty);
+        assertFalse(WidgetLogic.applyPantryUse(s, "missing"));
+        s.pantry.get(0).qty = 4;
+        WidgetLogic.applyToggle(s, WidgetLogic.TARGET_PANTRY, "p1", false, "2026-10-28");
+        assertEquals(3, s.pantry.get(0).qty);
+    }
+
+    @Test
+    public void rows_pantryWidgetListsEverythingSorted() {
+        Snapshot s = sample();
+        s.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, null));
+        s.pantry.add(new Snapshot.Pantry("low", "c", "pack", 1, 1, "2026-10-26"));
+        s.pantry.add(new Snapshot.Pantry("soon", "a", "bag", 9, 1, "2026-10-31"));
+        List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_PANTRY, "2026-10-28");
+        assertEquals(3, rows.size());
+        WidgetLogic.Row low = rows.get(0);
+        assertEquals("low", low.id);
+        assertEquals(WidgetLogic.TARGET_PANTRY, low.target);
+        assertTrue(low.low);
+        assertEquals(Integer.valueOf(-2), low.expiryDays);
+        assertEquals(1, low.qty);
+        WidgetLogic.Row soon = rows.get(1);
+        assertEquals("soon", soon.id);
+        assertFalse(soon.low);
+        assertEquals(Integer.valueOf(3), soon.expiryDays);
+        assertEquals("bag", soon.unit);
+        WidgetLogic.Row ok = rows.get(2);
+        assertNull(ok.expiryDays);
+        assertEquals("개", ok.unit);
+        // No pantry items: no rows (the widget shows widget_pantryEmpty).
+        assertEquals(0, WidgetLogic.buildRows(sample(), WidgetLogic.KIND_PANTRY, "2026-10-28").size());
+        assertEquals(0, WidgetLogic.buildRows(Snapshot.signedOut(0), WidgetLogic.KIND_PANTRY, "2026-10-28").size());
+    }
+
+    @Test
+    public void rows_tabletPantrySectionOnlyLowOrExpiring() {
+        Snapshot s = sample();
+        s.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, "2027-01-01"));
+        s.pantry.add(new Snapshot.Pantry("low", "c", "", 0, 1, null));
+        s.pantry.add(new Snapshot.Pantry("soon", "a", "", 9, 1, "2026-11-01"));
+        List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28");
+        List<String> keys = new ArrayList<>();
+        for (WidgetLogic.Row r : rows) keys.add(r.type == WidgetLogic.Row.SECTION ? "#" + r.key : r.id);
+        assertEquals(Arrays.asList(
+                "#today", "b", "a",
+                "#routine", "r1", "r2", "r3",
+                "#kidsnote", "k1",
+                "#shopping", "s1", "s2",
+                "#pantry", "low", "soon"), keys);
+
+        // Nothing low or expiring: no pantry section at all.
+        Snapshot calm = sample();
+        calm.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, null));
+        for (WidgetLogic.Row r : WidgetLogic.buildRows(calm, WidgetLogic.KIND_TABLET, "2026-10-28")) {
+            assertFalse(WidgetLogic.SECTION_PANTRY.equals(r.key) || WidgetLogic.TARGET_PANTRY.equals(r.target));
+        }
+    }
+
+    @Test
+    public void snapshot_pantryRoundTripAndOldCache() {
+        Snapshot s = sample();
+        s.pantry.add(new Snapshot.Pantry("p1", "rice", "pack", 3, 2, "2026-11-01"));
+        s.pantry.add(new Snapshot.Pantry("p2", "tissue", null, 0, 1.5, null));
+        Snapshot r = Snapshot.fromJson(s.toJson());
+        assertNotNull(r);
+        assertEquals(2, r.pantry.size());
+        assertEquals("rice", r.pantry.get(0).name);
+        assertEquals("pack", r.pantry.get(0).unit);
+        assertEquals(3, r.pantry.get(0).qty);
+        assertEquals(2.0, r.pantry.get(0).minQty, 0);
+        assertEquals("2026-11-01", r.pantry.get(0).expiry);
+        assertNull(r.pantry.get(1).unit);
+        assertNull(r.pantry.get(1).expiry);
+        assertEquals(1.5, r.pantry.get(1).minQty, 0);
+        assertEquals(s.toJson(), r.toJson());
+
+        // A cache saved before the pantry existed still loads, with no items.
+        Snapshot old = Snapshot.fromJson("{\"v\":1,\"status\":\"ok\",\"fetchedAt\":1,\"todos\":[]}");
+        assertNotNull(old);
+        assertEquals(0, old.pantry.size());
+    }
+
     // ---------- formatting ----------
 
     @Test

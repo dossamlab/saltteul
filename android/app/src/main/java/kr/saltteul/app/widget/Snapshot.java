@@ -31,6 +31,8 @@ public final class Snapshot {
     public final List<String> routineLogIds = new ArrayList<>();
     public final List<Anniversary> anniversaries = new ArrayList<>();
     public final List<Weather> weather = new ArrayList<>();
+    /** Every pantry item (households/home/pantry). */
+    public final List<Pantry> pantry = new ArrayList<>();
     public String headline;
     /** role ('husband'|'wife') to display name. */
     public final Map<String, String> memberNames = new HashMap<>();
@@ -60,6 +62,8 @@ public final class Snapshot {
 
     public static final class Shop {
         public String id, name, consumableId;
+        /** Linked pantry item: buying adds its restockQty (null when not linked). */
+        public String pantryId;
         public long createdAt;
         public boolean bought;
 
@@ -119,6 +123,25 @@ public final class Snapshot {
         }
     }
 
+    public static final class Pantry {
+        public String id, name, unit;
+        public int qty;
+        public double minQty;
+        /** 'YYYY-MM-DD' or null. */
+        public String expiry;
+
+        public Pantry() {}
+
+        public Pantry(String id, String name, String unit, int qty, double minQty, String expiry) {
+            this.id = id;
+            this.name = name;
+            this.unit = unit;
+            this.qty = qty;
+            this.minQty = minQty;
+            this.expiry = expiry;
+        }
+    }
+
     // ---------- JSON ----------
 
     public String toJson() {
@@ -148,6 +171,7 @@ public final class Snapshot {
                 put(j, "id", s.id);
                 put(j, "name", s.name);
                 put(j, "consumableId", s.consumableId);
+                put(j, "pantryId", s.pantryId);
                 j.put("createdAt", s.createdAt);
                 j.put("bought", s.bought);
                 a.put(j);
@@ -192,6 +216,18 @@ public final class Snapshot {
                 a.put(j);
             }
             o.put("weather", a);
+            a = new JSONArray();
+            for (Pantry p : pantry) {
+                JSONObject j = new JSONObject();
+                put(j, "id", p.id);
+                put(j, "name", p.name);
+                put(j, "unit", p.unit);
+                j.put("qty", p.qty);
+                j.put("minQty", p.minQty);
+                put(j, "expiry", p.expiry);
+                a.put(j);
+            }
+            o.put("pantry", a);
             JSONObject m = new JSONObject();
             for (Map.Entry<String, String> e : memberNames.entrySet()) m.put(e.getKey(), e.getValue());
             o.put("memberNames", m);
@@ -223,6 +259,7 @@ public final class Snapshot {
             for (int i = 0; a != null && i < a.length(); i++) {
                 JSONObject j = a.getJSONObject(i);
                 Shop sh = new Shop(str(j, "id"), str(j, "name"), str(j, "consumableId"), j.optLong("createdAt", 0));
+                sh.pantryId = str(j, "pantryId");
                 sh.bought = j.optBoolean("bought", false);
                 s.shopping.add(sh);
             }
@@ -249,6 +286,13 @@ public final class Snapshot {
             for (int i = 0; a != null && i < a.length(); i++) {
                 JSONObject j = a.getJSONObject(i);
                 s.weather.add(new Weather(str(j, "day"), num(j, "minC"), num(j, "maxC"), num(j, "popMax")));
+            }
+            // Caches written before the pantry existed have no "pantry" key: empty list.
+            a = o.optJSONArray("pantry");
+            for (int i = 0; a != null && i < a.length(); i++) {
+                JSONObject j = a.getJSONObject(i);
+                s.pantry.add(new Pantry(str(j, "id"), str(j, "name"), str(j, "unit"), j.optInt("qty", 0),
+                        j.optDouble("minQty", 0), str(j, "expiry")));
             }
             JSONObject m = o.optJSONObject("memberNames");
             if (m != null) {

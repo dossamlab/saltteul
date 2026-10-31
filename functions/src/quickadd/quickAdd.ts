@@ -3,7 +3,8 @@
 import type { Firestore } from 'firebase-admin/firestore'
 import { diffDays, householdDate, isValidYmd, seoulTime, weekdayOf } from '../../../shared/householdDate'
 import { routinesForDay } from '../../../shared/routines'
-import type { Chore, Owner, PrepItem, QuickAddResult, QuickItem, Routine, RoutineLog, ShoppingItem, Ymd } from '../../../shared/types'
+import { applyPantryOp } from '../../../shared/pantry'
+import type { Chore, Owner, PantryItem, PrepItem, QuickAddResult, QuickItem, Routine, RoutineLog, ShoppingItem, Ymd } from '../../../shared/types'
 import type { ClaudePort } from '../claude/client'
 import type { QuickAddInput } from '../claude/inputs'
 import { OWNERS, type RawQuickAdd } from '../claude/schemas'
@@ -42,13 +43,21 @@ export interface QuickContext {
   today: Ymd
   routines: QuickAddInput['routines']
   chores: QuickAddInput['chores']
+  pantry: (QuickAddInput['pantry'][number] & { restockQty?: number })[]
 }
+
+const PANTRY_OPS = { pantryUse: 'use', pantrySet: 'set', pantryAdd: 'add' } as const
+const MAX_PANTRY_AMOUNT = 9999
 
 /** Applies the household rules to Claude's proposal. Bad fields are cleared, unknown routine/chore ids dropped. */
 export function finalizeQuickAdd(raw: RawQuickAdd, ctx: QuickContext): Pick<QuickAddResult, 'items' | 'unparsed'> {
   const routines = new Map(ctx.routines.map((r) => [r.id, r]))
   const chores = new Map(ctx.chores.map((c) => [c.id, c]))
+  const pantry = new Map(ctx.pantry.map((p) => [p.id, p]))
+  /** Running counts, so "3개 쓰고 2개 샀어" on one item chains correctly. */
+  const running = new Map(ctx.pantry.map((p) => [p.id, p.qty]))
   const items: QuickItem[] = []
+  const unparsedExtra: string[] = []
   const seen = new Set<string>()
   const once = (key: string) => (seen.has(key) ? false : (seen.add(key), true))
 
@@ -93,22 +102,53 @@ export function finalizeQuickAdd(raw: RawQuickAdd, ctx: QuickContext): Pick<Quic
         items.push({ kind: 'choreDone', choreId: c.id, title: c.title })
         break
       }
+      case 'pantryUse':
+      case 'pantrySet':
+      case 'pantryAdd': {
+        const op = PANTRY_OPS[it.kind]
+        const said = it.amount === null ? null : Math.min(MAX_PANTRY_AMOUNT, Math.round(it.amount))
+        const p = it.refId ? pantry.get(it.refId) : undefined
+        if (!p) {
+          // Unknown item: offer to register it when a count was said, otherwise show the words as not understood.
+          const name = cut(it.title, 40)
+          if (!name) break
+          if ((op === 'set' || op === 'add') && said !== null && once(`pantryNew|${norm(name)}`)) {
+            items.push({ kind: 'pantryNew', name, unit: '개', qty: said })
+          } else {
+            unparsedExtra.push(said === null ? name : `${name} ${said}`)
+          }
+          break
+        }
+        const amount = said ?? (op === 'use' ? 1 : op === 'add' ? p.restockQty || 0 : null)
+        if (amount === null || (op !== 'set' && amount <= 0)) {
+          unparsedExtra.push(p.name)
+          break
+        }
+        const before = running.get(p.id) ?? p.qty
+        const after = applyPantryOp(before, op, amount)
+        running.set(p.id, after)
+        items.push({ kind: 'pantry', pantryId: p.id, name: p.name, unit: p.unit, op, amount, before, after })
+        break
+      }
     }
   }
-  const unparsed = raw.unparsed.map((u) => u.slice(0, 200)).slice(0, MAX_UNPARSED)
+  const unparsed = [...raw.unparsed, ...unparsedExtra].map((u) => u.slice(0, 200)).slice(0, MAX_UNPARSED)
   return { items, unparsed }
 }
 
 /** Everything Claude needs besides the text. */
-export async function loadQuickAddContext(db: Firestore, uid: string, now: Date): Promise<Omit<QuickAddInput, 'text'>> {
+export async function loadQuickAddContext(
+  db: Firestore, uid: string, now: Date,
+): Promise<Omit<QuickAddInput, 'text'> & Pick<QuickContext, 'pantry'>> {
   const h = `households/${HID}`
   const today = householdDate(now)
-  const [members, routinesSnap, logsSnap, choresSnap, shoppingSnap] = await Promise.all([
+  const [members, routinesSnap, logsSnap, choresSnap, shoppingSnap, pantrySnap] = await Promise.all([
     listMembers(db),
     db.collection(`${h}/routines`).get(),
     db.collection(`${h}/routineLogs`).where('day', '==', today).get(),
     db.collection(`${h}/chores`).get(),
     db.collection(`${h}/shopping`).where('bought', '==', false).get(),
+    db.collection(`${h}/pantry`).get(),
   ])
   const me = members.find((m) => m.uid === uid)
   const routines = routinesSnap.docs.map((d) => ({ ...(d.data() as Routine), id: d.id }))
@@ -127,6 +167,9 @@ export async function loadQuickAddContext(db: Firestore, uid: string, now: Date)
     })),
     chores: choresSnap.docs.map((d) => ({ ...(d.data() as Chore), id: d.id })).map((c) => ({ id: c.id, title: c.title, owner: c.owner })),
     openShopping: shoppingSnap.docs.map((d) => (d.data() as ShoppingItem).name).filter(Boolean),
+    pantry: pantrySnap.docs.map((d) => ({ ...(d.data() as PantryItem), id: d.id })).map((p) => ({
+      id: p.id, name: p.name, unit: p.unit || '개', qty: p.qty ?? 0, aliases: p.aliases ?? [], restockQty: p.restockQty ?? 0,
+    })),
   }
 }
 

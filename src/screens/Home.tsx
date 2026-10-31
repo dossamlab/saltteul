@@ -95,7 +95,7 @@ function ShoppingHomeCard({ go, className }: { go: Go; className?: string }) {
       <div className="divide-y divide-line">
         {shown.map((s) => (
           <div key={s.id} className="flex items-center gap-3 py-2.5">
-            <Checkbox checked={s.bought} label={s.name} onChange={() => toggleShopping(h.hid, s, h.uid, h.today, h.consumables)} />
+            <Checkbox checked={s.bought} label={s.name} onChange={() => toggleShopping(h.hid, s, h.uid, h.today, h.consumables, h.pantry)} />
             <p className="min-w-0 flex-1 truncate text-[15px]">
               {s.name}
               {s.qty && <span className="ml-1.5 text-[13px] text-ink-2">{s.qty}</span>}

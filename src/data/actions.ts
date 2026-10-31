@@ -1,9 +1,10 @@
-import { addDoc, collection, deleteDoc, doc, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, setDoc, updateDoc, writeBatch, type WriteBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
+import { applyPantryOp } from '../../shared/pantry'
 import { routineLogId } from '../../shared/routines'
 import type {
-  Anniversary, Chore, Consumable, MenuExtractResult, MonthlyMenu, Nudge, Owner, PrepRule, QuickAddResult, Routine, Settings,
-  ShoppingItem, Todo, Ymd,
+  Anniversary, Chore, Consumable, MenuExtractResult, MonthlyMenu, Nudge, Owner, PantryItem, PantryLog, PantryOp, PrepRule,
+  QuickAddResult, Routine, Settings, ShoppingItem, Todo, Ymd,
 } from '../../shared/types'
 import { db, functions } from '../firebase'
 
@@ -41,7 +42,9 @@ export function addShopping(hid: string, uid: string, name: string, extra: Parti
     name: name.trim(), addedBy: uid, bought: false, source: 'manual' as const, createdAt: now(), ...extra,
   }))
 }
-export async function toggleShopping(hid: string, item: ShoppingItem, uid: string, today: Ymd, consumables: Consumable[]) {
+export async function toggleShopping(
+  hid: string, item: ShoppingItem, uid: string, today: Ymd, consumables: Consumable[], pantry: PantryItem[] = [],
+) {
   const bought = !item.bought
   const b = writeBatch(db)
   b.update(ref(hid, 'shopping', item.id), { bought, boughtBy: bought ? uid : null, boughtAt: bought ? now() : null })
@@ -52,6 +55,9 @@ export async function toggleShopping(hid: string, item: ShoppingItem, uid: strin
       : c.purchases.filter((p) => p !== today)
     b.update(ref(hid, 'consumables', c.id), { purchases })
   }
+  // A linked pantry item gets its usual purchase amount; unticking takes it back off.
+  const p = item.pantryId ? pantry.find((x) => x.id === item.pantryId) : undefined
+  if (p && p.restockQty > 0) pantryChange(b, hid, uid, p, bought ? 'buy' : 'use', p.restockQty, 'shopping')
   await b.commit()
 }
 export const updateShopping = (hid: string, id: string, patch: Partial<ShoppingItem>) =>
@@ -96,6 +102,52 @@ export const updateConsumable = (hid: string, id: string, p: Partial<Consumable>
 export const deleteConsumable = (hid: string, id: string) => deleteDoc(ref(hid, 'consumables', id))
 export const addConsumableToShopping = (hid: string, uid: string, c: Consumable) =>
   addShopping(hid, uid, c.name, { source: 'consumable', consumableId: c.id })
+
+// Pantry (상비품). Counts are written from the app's current snapshot, so a change also works offline; the two members
+// rarely change the same item at the same moment, and the last write wins like every other field here.
+export type PantryDraft = Pick<PantryItem, 'name' | 'unit' | 'qty' | 'minQty' | 'restockQty'> & Partial<Pick<PantryItem, 'aliases' | 'expiry'>>
+export const addPantryItem = (hid: string, uid: string, p: PantryDraft) =>
+  addDoc(col(hid, 'pantry'), clean({ ...p, name: p.name.trim(), unit: p.unit.trim() || '개', updatedAt: now(), updatedBy: uid, lowNotifiedAt: null }))
+export const updatePantryItem = (hid: string, uid: string, id: string, p: Partial<PantryDraft>) =>
+  updateDoc(ref(hid, 'pantry', id), clean({ ...p, updatedAt: now(), updatedBy: uid }))
+export const deletePantryItem = (hid: string, id: string) => deleteDoc(ref(hid, 'pantry', id))
+
+/** Adds the count change and its log line to a batch. */
+function pantryChange(b: WriteBatch, hid: string, uid: string, p: PantryItem, op: PantryOp, amount: number, source: PantryLog['source']) {
+  const before = p.qty ?? 0
+  const after = applyPantryOp(before, op, amount)
+  b.update(ref(hid, 'pantry', p.id), { qty: after, updatedAt: now(), updatedBy: uid })
+  b.set(doc(col(hid, 'pantryLog')), { itemId: p.id, name: p.name, op, amount: Math.round(amount), before, after, by: uid, at: now(), source })
+  return after
+}
+
+export async function changePantryQty(
+  hid: string, uid: string, p: PantryItem, op: PantryOp, amount: number, source: PantryLog['source'] = 'app',
+) {
+  const b = writeBatch(db)
+  pantryChange(b, hid, uid, p, op, amount, source)
+  await b.commit()
+}
+
+/** Several changes in order (quick add): each starts from the count the previous one left. One batch. */
+export async function applyPantryOps(
+  hid: string, uid: string, pantry: PantryItem[], ops: { pantryId: string; op: PantryOp; amount: number }[], source: PantryLog['source'],
+): Promise<number> {
+  const running = new Map(pantry.map((p) => [p.id, { ...p }]))
+  const b = writeBatch(db)
+  let n = 0
+  for (const o of ops) {
+    const p = running.get(o.pantryId)
+    if (!p) continue
+    p.qty = pantryChange(b, hid, uid, p, o.op, o.amount, source)
+    n++
+  }
+  if (n) await b.commit()
+  return n
+}
+
+export const addPantryToShopping = (hid: string, uid: string, p: PantryItem) =>
+  addShopping(hid, uid, p.name, { source: 'pantry', pantryId: p.id, ...(p.restockQty > 0 ? { qty: `${p.restockQty}${p.unit || '개'}` } : {}) })
 
 export const addPrepRule = (hid: string, r: Omit<PrepRule, 'id'>) => addDoc(col(hid, 'prepRules'), r)
 export const updatePrepRule = (hid: string, id: string, p: Partial<PrepRule>) => updateDoc(ref(hid, 'prepRules', id), p)

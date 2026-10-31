@@ -2,8 +2,8 @@ import { collection, doc, limit, onSnapshot, orderBy, query, where, type Query }
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { addDays, householdDate } from '../../shared/householdDate'
 import type {
-  Anniversary, Briefing, Chore, Consumable, DinnerSuggestion, IntegrationState, JournalEntry, Member, Nudge, Owner, PrepRule,
-  Routine, RoutineLog, Settings, ShoppingItem, Todo, Ymd,
+  Anniversary, Briefing, Chore, Consumable, DinnerSuggestion, IntegrationState, JournalEntry, Member, Nudge, Owner, PantryItem,
+  PrepRule, Routine, RoutineLog, Settings, ShoppingItem, Todo, Ymd,
 } from '../../shared/types'
 import { useReadySession } from '../auth/session'
 import { t } from '../copy'
@@ -22,6 +22,8 @@ export interface HouseholdData {
   chores: Chore[]
   anniversaries: Anniversary[]
   consumables: Consumable[]
+  /** Things the house should always have (상비품). */
+  pantry: PantryItem[]
   prepRules: PrepRule[]
   briefings: Briefing[]
   nudges: Nudge[]
@@ -79,6 +81,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [chores] = useList<Chore>(c('chores'), [hid])
   const [anniversaries] = useList<Anniversary>(c('anniversaries'), [hid])
   const [consumables] = useList<Consumable>(c('consumables'), [hid])
+  const [pantry] = useList<PantryItem>(c('pantry'), [hid])
   const [prepRules] = useList<PrepRule>(c('prepRules'), [hid])
   const [briefings, l4] = useList<Briefing>(query(c('briefings'), orderBy('createdAt', 'desc'), limit(4)), [hid])
   const [nudges] = useList<Nudge>(query(c('nudges'), where('to', '==', user.uid), orderBy('createdAt', 'desc'), limit(30)), [hid])
@@ -115,9 +118,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return {
       loaded: l1 && l2 && l3 && l4 && l5,
       hid, uid: user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables,
-      prepRules, briefings, nudges, integrations, journal, dinner, settings, nameOf, me, partner,
+      pantry, prepRules, briefings, nudges, integrations, journal, dinner, settings, nameOf, me, partner,
     }
-  }, [hid, user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables, prepRules,
+  }, [hid, user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables, pantry, prepRules,
     briefings, nudges, integrations, journal, dinner, settings, l1, l2, l3, l4, l5])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

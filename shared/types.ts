@@ -4,7 +4,7 @@
 export type Ymd = string
 export type Owner = 'husband' | 'wife' | 'both'
 export type Role = 'husband' | 'wife'
-export type Source = 'manual' | 'calendar' | 'kidsnote' | 'consumable'
+export type Source = 'manual' | 'calendar' | 'kidsnote' | 'consumable' | 'pantry'
 
 export interface Member {
   uid: string
@@ -47,6 +47,8 @@ export interface ShoppingItem {
   boughtAt?: number | null
   source: Source
   consumableId?: string | null
+  /** Linked pantry item: marking this bought adds its restockQty. */
+  pantryId?: string | null
   kidsnoteBatchId?: string | null
   createdAt: number
 }
@@ -67,6 +69,47 @@ export interface Consumable {
   name: string
   initialCycleDays: number
   purchases: Ymd[] // ascending
+}
+
+/**
+ * households/{hid}/pantry/{id}: something the house should always have (햇반, 물티슈), counted in `unit`.
+ * Written by the app, the widget (−1) and quick add; the server only sends the low-stock alert.
+ */
+export interface PantryItem {
+  id: string
+  name: string
+  /** Counting word shown after the number: 개, 팩, 봉 ... */
+  unit: string
+  qty: number
+  /** At or below this the item is low: shopping suggestion, briefing line, one alert to the other member. */
+  minQty: number
+  /** Added to qty when the linked shopping item is marked bought, or "한 박스 샀어" says no number. */
+  restockQty: number
+  /** Other names quick add should match, e.g. 즉석밥 for 햇반. */
+  aliases?: string[]
+  /** Nearest expiry date of what is in the house; null when it does not matter. */
+  expiry?: Ymd | null
+  updatedAt: number
+  /** uid of the member who changed qty last (the low alert goes to the other one). */
+  updatedBy?: string | null
+  /** Server: when the low alert was sent; cleared once qty is back above minQty. */
+  lowNotifiedAt?: number | null
+}
+
+export type PantryOp = 'use' | 'set' | 'add' | 'buy'
+
+/** households/{hid}/pantryLog/{id}: one change of a pantry count. */
+export interface PantryLog {
+  id: string
+  itemId: string
+  name: string
+  op: PantryOp
+  amount: number
+  before: number
+  after: number
+  by: string | null
+  at: number
+  source: 'app' | 'voice' | 'widget' | 'shopping'
 }
 
 export interface PrepRule {
@@ -158,6 +201,10 @@ export type QuickItem =
   | { kind: 'shopping'; name: string; qty: string | null; note: string | null }
   | { kind: 'routineDone'; routineId: string; title: string }
   | { kind: 'choreDone'; choreId: string; title: string }
+  /** A pantry count change; before/after are what the proposal was computed against. */
+  | { kind: 'pantry'; pantryId: string; name: string; unit: string; op: 'use' | 'set' | 'add'; amount: number; before: number; after: number }
+  /** A pantry item that is not registered yet, proposed with the count that was said. */
+  | { kind: 'pantryNew'; name: string; unit: string; qty: number }
 
 export interface QuickAddResult {
   items: QuickItem[]

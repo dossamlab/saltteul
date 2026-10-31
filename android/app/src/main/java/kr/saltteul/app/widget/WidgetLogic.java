@@ -1,5 +1,6 @@
 package kr.saltteul.app.widget;
 
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,8 +11,8 @@ import java.util.Set;
 
 /**
  * Pure logic shared by all widgets: household day (port of shared/householdDate.ts),
- * routines (shared/routines.ts), anniversaries (shared/anniversaries.ts) and the rows each
- * widget shows. No Android types here so it runs in plain JVM unit tests.
+ * routines (shared/routines.ts), anniversaries (shared/anniversaries.ts), pantry (shared/pantry.ts)
+ * and the rows each widget shows. No Android types here so it runs in plain JVM unit tests.
  * Dates are 'YYYY-MM-DD' strings on the Asia/Seoul calendar.
  */
 public final class WidgetLogic {
@@ -21,15 +22,19 @@ public final class WidgetLogic {
     public static final String KIND_DASHBOARD = "dashboard";
     public static final String KIND_TODO = "todo";
     public static final String KIND_TABLET = "tablet";
+    public static final String KIND_PANTRY = "pantry";
 
     public static final String TARGET_TODO = "todo";
     public static final String TARGET_ROUTINE = "routine";
     public static final String TARGET_SHOPPING = "shopping";
+    /** Pantry rows have a −1 button instead of a checkbox. */
+    public static final String TARGET_PANTRY = "pantry";
 
     public static final String SECTION_TODAY = "today";
     public static final String SECTION_ROUTINE = "routine";
     public static final String SECTION_KIDSNOTE = "kidsnote";
     public static final String SECTION_SHOPPING = "shopping";
+    public static final String SECTION_PANTRY = "pantry";
     public static final String NOTE_ALL_DONE = "allDone";
 
     static final int DASHBOARD_TODOS = 3;
@@ -37,6 +42,15 @@ public final class WidgetLogic {
     static final int TABLET_TODOS = 6;
     static final int TABLET_KIDSNOTE = 3;
     static final int TABLET_SHOPPING = 6;
+    static final int TABLET_PANTRY = 6;
+
+    /** Expiry within this many days (or already past) shows a badge (shared/pantry.ts EXPIRY_SOON_DAYS). */
+    static final int EXPIRY_SOON_DAYS = 7;
+    /**
+     * Unit for items saved without one: the same data default as qtyLabel in shared/pantry.ts
+     * ('개' is the counting word gae). It is stored data, not UI copy, so it is not a string resource.
+     */
+    static final String DEFAULT_PANTRY_UNIT = "개";
 
     // Seoul has no DST, so a fixed +9h offset is exact.
     static final long HOUR_MS = 60L * 60 * 1000;
@@ -225,6 +239,87 @@ public final class WidgetLogic {
         return daysLeft == 0 ? "D-day" : "D-" + daysLeft;
     }
 
+    // ---------- pantry (keep in step with shared/pantry.ts) ----------
+
+    public static boolean isLow(Snapshot.Pantry p) {
+        return p.qty <= p.minQty;
+    }
+
+    /** Days until expiry (negative when past), or null when the item has no expiry. */
+    public static Integer daysToExpiry(Snapshot.Pantry p, String today) {
+        return isYmd(p.expiry) ? Integer.valueOf(diffDays(today, p.expiry)) : null;
+    }
+
+    public static boolean expiresSoon(Snapshot.Pantry p, String today) {
+        Integer d = daysToExpiry(p, today);
+        return d != null && d <= EXPIRY_SOON_DAYS;
+    }
+
+    /** Past the expiry date: the badge reads "expired" instead of "N days". */
+    public static boolean isExpired(Snapshot.Pantry p, String today) {
+        Integer d = daysToExpiry(p, today);
+        return d != null && d < 0;
+    }
+
+    private static int pantryRank(Snapshot.Pantry p, String today) {
+        return isLow(p) ? 0 : expiresSoon(p, today) ? 1 : 2;
+    }
+
+    /** Low items first, then items expiring soon, then by name (Korean collation). */
+    public static List<Snapshot.Pantry> sortPantry(List<Snapshot.Pantry> list, final String today) {
+        List<Snapshot.Pantry> out = new ArrayList<>(list);
+        final Collator ko = Collator.getInstance(Locale.KOREAN);
+        Collections.sort(out, new Comparator<Snapshot.Pantry>() {
+            @Override
+            public int compare(Snapshot.Pantry a, Snapshot.Pantry b) {
+                int c = pantryRank(a, today) - pantryRank(b, today);
+                return c != 0 ? c : ko.compare(nz(a.name), nz(b.name));
+            }
+        });
+        return out;
+    }
+
+    /** Low or expiring-soon items, in pantry order (the tablet only shows these). */
+    public static List<Snapshot.Pantry> pantryAlerts(Snapshot s, String today) {
+        List<Snapshot.Pantry> out = new ArrayList<>();
+        for (Snapshot.Pantry p : sortPantry(s.pantry, today)) if (pantryRank(p, today) < 2) out.add(p);
+        return out;
+    }
+
+    /** Count after the widget's −1 ('use' 1 in applyPantryOp): never below zero. */
+    public static long pantryAfterUse(long before) {
+        return Math.max(0, before - 1);
+    }
+
+    /** Whole, non-negative amount for a count change (applyPantryOp rounds the same way). */
+    public static long pantryAmount(double amount) {
+        return Math.max(0, Math.round(amount));
+    }
+
+    /**
+     * Count after ticking a linked shopping item: bought adds the amount ('buy'), unticking takes it
+     * back off ('use'). Never below zero (applyPantryOp in shared/pantry.ts).
+     */
+    public static long pantryAfterShopping(long before, long amount, boolean bought) {
+        return Math.max(0, bought ? before + amount : before - amount);
+    }
+
+    public static String pantryUnit(String unit) {
+        return unit == null || unit.trim().isEmpty() ? DEFAULT_PANTRY_UNIT : unit.trim();
+    }
+
+    /** Optimistic −1 on the cached snapshot. False when the item is unknown or already at zero. */
+    public static boolean applyPantryUse(Snapshot s, String id) {
+        if (s == null || id == null) return false;
+        for (Snapshot.Pantry p : s.pantry) {
+            if (!id.equals(p.id)) continue;
+            if (p.qty <= 0) return false;
+            p.qty = (int) pantryAfterUse(p.qty);
+            return true;
+        }
+        return false;
+    }
+
     // ---------- small formatting helpers ----------
 
     /** Replaces {key} tokens in a copy template, e.g. fill("{m}/{d}", "m", "10", "d", "28"). */
@@ -275,6 +370,16 @@ public final class WidgetLogic {
         public String time;
         public String owner;
         public String consumableId;
+        public String pantryId;
+        /**
+         * Pantry rows: count, unit (never empty), low marker, days to expiry when the badge shows (else null),
+         * and expired (days &lt; 0: "expired" badge; 0..7 shows the day count).
+         */
+        public int qty;
+        public String unit;
+        public boolean low;
+        public Integer expiryDays;
+        public boolean expired;
 
         Row(int type) {
             this.type = type;
@@ -320,7 +425,21 @@ public final class WidgetLogic {
             r.id = s.id;
             r.title = s.name;
             r.consumableId = s.consumableId;
+            r.pantryId = s.pantryId;
             r.checked = s.bought;
+            return r;
+        }
+
+        static Row pantry(Snapshot.Pantry p, String today) {
+            Row r = new Row(ITEM);
+            r.target = TARGET_PANTRY;
+            r.id = p.id;
+            r.title = p.name;
+            r.qty = p.qty;
+            r.unit = pantryUnit(p.unit);
+            r.low = isLow(p);
+            r.expiryDays = expiresSoon(p, today) ? daysToExpiry(p, today) : null;
+            r.expired = isExpired(p, today);
             return r;
         }
     }
@@ -424,6 +543,14 @@ public final class WidgetLogic {
                 rows.add(Row.section(SECTION_SHOPPING));
                 for (int i = 0; i < shop.size() && i < TABLET_SHOPPING; i++) rows.add(Row.shop(shop.get(i)));
             }
+            List<Snapshot.Pantry> pantry = pantryAlerts(s, day);
+            if (!pantry.isEmpty()) {
+                rows.add(Row.section(SECTION_PANTRY));
+                for (int i = 0; i < pantry.size() && i < TABLET_PANTRY; i++) rows.add(Row.pantry(pantry.get(i), day));
+            }
+        } else if (KIND_PANTRY.equals(kind)) {
+            // Every item; the list scrolls. Empty list shows widget_pantryEmpty.
+            for (Snapshot.Pantry p : sortPantry(s.pantry, day)) rows.add(Row.pantry(p, day));
         }
         return rows;
     }
@@ -432,11 +559,13 @@ public final class WidgetLogic {
 
     /**
      * Applies a checkbox tap to the cached snapshot so the widget redraws before Firestore answers.
-     * wasChecked is the state the row showed when tapped.
+     * wasChecked is the state the row showed when tapped (unused for the pantry −1).
      */
     public static void applyToggle(Snapshot s, String target, String id, boolean wasChecked, String day) {
         if (s == null || id == null) return;
-        if (TARGET_TODO.equals(target)) {
+        if (TARGET_PANTRY.equals(target)) {
+            applyPantryUse(s, id);
+        } else if (TARGET_TODO.equals(target)) {
             for (Snapshot.Todo t : s.todos) if (id.equals(t.id)) t.done = !wasChecked;
         } else if (TARGET_SHOPPING.equals(target)) {
             for (Snapshot.Shop i : s.shopping) if (id.equals(i.id)) i.bought = !wasChecked;

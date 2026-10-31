@@ -72,6 +72,18 @@
                 android:resource="@xml/widget_tablet_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.PantryWidget"
+            android:exported="false"
+            android:label="@string/widget_pantry_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_pantry_info" />
+        </receiver>
+
         <service
             android:name=".widget.WidgetListService"
             android:exported="false"
@@ -82,7 +94,7 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
-        <!-- Checkbox taps arrive through our own PendingIntent, so this stays private. -->
+        <!-- Checkbox taps and pantry −1 arrive through our own PendingIntent, so this stays private. -->
         <receiver
             android:name=".widget.ToggleReceiver"
             android:exported="false" />

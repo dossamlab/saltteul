@@ -17,7 +17,7 @@ const ALREADY_DEADLINE = '참가비 납부 마감'
 const t = makeT({ 'kidsnote.deadlineTitle': 'Due: {title}' })
 
 const item = (p: Partial<RawQuickItem>): RawQuickItem => ({
-  kind: 'todo', title: 'x', date: null, time: null, owner: null, note: null, qty: null, refId: null, prepItems: [], ...p,
+  kind: 'todo', title: 'x', date: null, time: null, owner: null, note: null, qty: null, refId: null, prepItems: [], amount: null, ...p,
 })
 
 function seed() {
@@ -41,7 +41,38 @@ describe('finalizeQuickAdd', () => {
     today: TODAY,
     routines: [{ id: 'r1', title: 'Vitamins', owner: 'both' as const, doneToday: false }, { id: 'r3', title: 'Walk', owner: 'wife' as const, doneToday: true }],
     chores: [{ id: 'c1', title: 'Bathroom', owner: 'husband' as const }],
+    pantry: [
+      { id: 'p1', name: 'Wet wipes', unit: 'pack', qty: 8, aliases: [], restockQty: 10 },
+      { id: 'p2', name: 'Rice bowl', unit: 'ea', qty: 3, aliases: ['instant rice'], restockQty: 12 },
+    ],
   }
+
+  it('turns pantry sentences into count changes, chaining changes on one item', () => {
+    const out = finalizeQuickAdd({
+      items: [
+        item({ kind: 'pantryUse', refId: 'p1', title: 'Wet wipes', amount: 3 }),
+        item({ kind: 'pantryAdd', refId: 'p1', title: 'Wet wipes', amount: 2 }),
+        item({ kind: 'pantrySet', refId: 'p2', title: 'Rice bowl', amount: 5 }),
+        item({ kind: 'pantryAdd', refId: 'p2', title: 'Rice bowl', amount: null }),
+        item({ kind: 'pantryUse', refId: 'p2', title: 'Rice bowl', amount: null }),
+        item({ kind: 'pantryUse', refId: 'p1', title: 'Wet wipes', amount: 50 }),
+        item({ kind: 'pantrySet', refId: null, title: 'Diapers', amount: 20 }),
+        item({ kind: 'pantryUse', refId: null, title: 'Tissue', amount: 2 }),
+        item({ kind: 'pantrySet', refId: 'p1', title: 'Wet wipes', amount: null }),
+      ],
+      unparsed: [],
+    }, ctx)
+    expect(out.items).toEqual([
+      { kind: 'pantry', pantryId: 'p1', name: 'Wet wipes', unit: 'pack', op: 'use', amount: 3, before: 8, after: 5 },
+      { kind: 'pantry', pantryId: 'p1', name: 'Wet wipes', unit: 'pack', op: 'add', amount: 2, before: 5, after: 7 },
+      { kind: 'pantry', pantryId: 'p2', name: 'Rice bowl', unit: 'ea', op: 'set', amount: 5, before: 3, after: 5 },
+      { kind: 'pantry', pantryId: 'p2', name: 'Rice bowl', unit: 'ea', op: 'add', amount: 12, before: 5, after: 17 },
+      { kind: 'pantry', pantryId: 'p2', name: 'Rice bowl', unit: 'ea', op: 'use', amount: 1, before: 17, after: 16 },
+      { kind: 'pantry', pantryId: 'p1', name: 'Wet wipes', unit: 'pack', op: 'use', amount: 50, before: 7, after: 0 },
+      { kind: 'pantryNew', name: 'Diapers', unit: '개', qty: 20 },
+    ])
+    expect(out.unparsed).toEqual(['Tissue 2', 'Wet wipes'])
+  })
 
   it('keeps valid fields, clears bad ones and drops unknown or finished routines and chores', () => {
     const out = finalizeQuickAdd({
@@ -113,6 +144,7 @@ describe('runQuickAdd', () => {
       ],
       chores: [{ id: 'c1', title: 'Bathroom', owner: 'husband' }],
       openShopping: ['Milk'],
+      pantry: [],
       text: 'call the pediatrician at 3',
     })
     expect(JSON.stringify([...db.store.docs])).toBe(before)

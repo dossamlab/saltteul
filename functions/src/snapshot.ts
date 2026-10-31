@@ -17,7 +17,7 @@ export async function loadSettings(db: Firestore): Promise<Settings> {
 /** Everything the briefing needs. Routine logs are limited to the last few household days. */
 export async function loadSnapshot(db: Firestore, now: Date): Promise<HouseholdSnapshot> {
   const since = addDays(householdDate(now), -2)
-  const [members, todos, shopping, routines, logs, chores, anniversaries, consumables, settings] = await Promise.all([
+  const [members, todos, shopping, routines, logs, chores, anniversaries, consumables, pantry, settings] = await Promise.all([
     all<HouseholdSnapshot['members'][number]>(db, 'members'),
     all<HouseholdSnapshot['todos'][number]>(db, 'todos'),
     all<HouseholdSnapshot['shopping'][number]>(db, 'shopping'),
@@ -26,6 +26,7 @@ export async function loadSnapshot(db: Firestore, now: Date): Promise<HouseholdS
     all<HouseholdSnapshot['chores'][number]>(db, 'chores'),
     all<HouseholdSnapshot['anniversaries'][number]>(db, 'anniversaries'),
     all<HouseholdSnapshot['consumables'][number]>(db, 'consumables'),
+    all<NonNullable<HouseholdSnapshot['pantry']>[number]>(db, 'pantry'),
     loadSettings(db),
   ])
   return {
@@ -37,6 +38,7 @@ export async function loadSnapshot(db: Firestore, now: Date): Promise<HouseholdS
     chores,
     anniversaries,
     consumables,
+    pantry,
     settings,
   }
 }

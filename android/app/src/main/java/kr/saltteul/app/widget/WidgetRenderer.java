@@ -13,18 +13,19 @@ import android.widget.RemoteViews;
 import kr.saltteul.app.MainActivity;
 import kr.saltteul.app.R;
 
-/** Builds the RemoteViews for the three widgets from the cached snapshot. */
+/** Builds the RemoteViews for the widgets from the cached snapshot. */
 public final class WidgetRenderer {
 
     private static final String TAG = "SaltteulWidget";
 
-    static final Class<?>[] PROVIDERS = {DashboardWidget.class, TodoWidget.class, TabletWidget.class};
+    static final Class<?>[] PROVIDERS = {DashboardWidget.class, TodoWidget.class, TabletWidget.class, PantryWidget.class};
 
     private WidgetRenderer() {}
 
     static String kindOf(Class<?> provider) {
         if (provider == TodoWidget.class) return WidgetLogic.KIND_TODO;
         if (provider == TabletWidget.class) return WidgetLogic.KIND_TABLET;
+        if (provider == PantryWidget.class) return WidgetLogic.KIND_PANTRY;
         return WidgetLogic.KIND_DASHBOARD;
     }
 
@@ -73,6 +74,7 @@ public final class WidgetRenderer {
     private static int layoutFor(String kind) {
         if (WidgetLogic.KIND_TODO.equals(kind)) return R.layout.widget_todo;
         if (WidgetLogic.KIND_TABLET.equals(kind)) return R.layout.widget_tablet;
+        if (WidgetLogic.KIND_PANTRY.equals(kind)) return R.layout.widget_pantry;
         return R.layout.widget_dashboard;
     }
 
@@ -103,6 +105,8 @@ public final class WidgetRenderer {
             v.setTextViewText(R.id.widget_title, c.getString(R.string.widget_todayTitle));
             int left = WidgetLogic.todoWidgetLeft(s, day);
             v.setTextViewText(R.id.widget_count, c.getString(R.string.widget_leftCount, String.valueOf(left)));
+        } else if (WidgetLogic.KIND_PANTRY.equals(kind)) {
+            v.setTextViewText(R.id.widget_title, c.getString(R.string.widget_pantryTitle));
         } else {
             fillHeader(c, v, s, day, now);
             if (WidgetLogic.KIND_DASHBOARD.equals(kind)) {

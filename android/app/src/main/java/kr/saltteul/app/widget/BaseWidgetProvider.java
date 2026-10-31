@@ -41,7 +41,7 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onDisabled(Context context) {
-        // Called per provider; keep the alarm while any of the three widgets is still placed.
+        // Called per provider; keep the alarm while any of the widgets is still placed.
         if (!WidgetRenderer.hasAnyWidget(context)) WidgetAlarmReceiver.cancel(context);
     }
 }

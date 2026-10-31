@@ -6,6 +6,7 @@ import { diffDays } from '../../shared/householdDate'
 import type { Anniversary, AnniversaryKind, Consumable, JournalEntry, PrepRule } from '../../shared/types'
 import { journalShareText } from '../data/pure'
 import { MenuSection } from '../components/MenuSection'
+import { PantrySection } from '../components/PantrySection'
 import { Button, Card, CardHeader, Empty, Field, IconButton, Pill, Segmented, Sheet } from '../components/ui'
 import { t } from '../copy'
 import {
@@ -308,6 +309,7 @@ export function OurHomeScreen({ openSettings, wide = false }: { openSettings: ()
           <AnniversarySection />
         </div>
         <div className="flex flex-col gap-5">
+          <PantrySection />
           <MenuSection />
           <ConsumableSection />
           <PrepRuleSection />
@@ -318,6 +320,7 @@ export function OurHomeScreen({ openSettings, wide = false }: { openSettings: ()
   return (
     <div className="flex flex-col gap-4">
       <AnniversarySection />
+      <PantrySection />
       <JournalSection />
       <MenuSection />
       <ConsumableSection />

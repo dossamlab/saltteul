@@ -3,6 +3,7 @@ package kr.saltteul.app.widget;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
+import androidx.annotation.NonNull;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.FirebaseApp;
@@ -14,6 +15,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.Transaction;
 import com.google.firebase.firestore.WriteBatch;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -125,8 +127,10 @@ public final class WidgetRepository {
                 .orderBy("createdAt", Query.Direction.DESCENDING).limit(1).get();
         Task<QuerySnapshot> membersT = home.collection("members").get();
         Task<DocumentSnapshot> settingsT = home.collection("settings").document("main").get();
+        Task<QuerySnapshot> pantryT = home.collection("pantry").get();
 
-        List<Task<?>> all = Arrays.<Task<?>>asList(todosT, shopT, routinesT, logsT, annT, briefT, membersT, settingsT);
+        List<Task<?>> all = Arrays.<Task<?>>asList(todosT, shopT, routinesT, logsT, annT, briefT, membersT, settingsT,
+                pantryT);
         Tasks.await(Tasks.whenAllComplete(all), timeoutSec, TimeUnit.SECONDS);
         for (Task<?> t : all) {
             Exception e = t.getException();
@@ -152,8 +156,10 @@ public final class WidgetRepository {
         }
         for (DocumentSnapshot d : shopT.getResult().getDocuments()) {
             Double created = num(d.get("createdAt"));
-            s.shopping.add(new Snapshot.Shop(d.getId(), str(d.get("name")), str(d.get("consumableId")),
-                    created == null ? 0 : created.longValue()));
+            Snapshot.Shop sh = new Snapshot.Shop(d.getId(), str(d.get("name")), str(d.get("consumableId")),
+                    created == null ? 0 : created.longValue());
+            sh.pantryId = str(d.get("pantryId"));
+            s.shopping.add(sh);
         }
         for (DocumentSnapshot d : routinesT.getResult().getDocuments()) {
             Double order = num(d.get("order"));
@@ -189,6 +195,14 @@ public final class WidgetRepository {
                 }
             }
         }
+        for (DocumentSnapshot d : pantryT.getResult().getDocuments()) {
+            Double qty = num(d.get("qty"));
+            Double minQty = num(d.get("minQty"));
+            String expiry = str(d.get("expiry"));
+            s.pantry.add(new Snapshot.Pantry(d.getId(), str(d.get("name")), str(d.get("unit")),
+                    qty == null ? 0 : (int) Math.max(0, Math.round(qty)), minQty == null ? 0 : minQty,
+                    WidgetLogic.isYmd(expiry) ? expiry : null));
+        }
         return s;
     }
 
@@ -213,16 +227,18 @@ public final class WidgetRepository {
     // ---------- write ----------
 
     /**
-     * Writes one checkbox tap. Blocking; call from a worker thread.
+     * Writes one checkbox tap or pantry −1. Blocking; call from a worker thread.
      * If the network is slow the write stays queued in Firestore's local cache and syncs later.
      */
     public static void writeToggleBlocking(Context c, String target, String id, boolean wasChecked,
-            String consumableId, String uid, String day, long now, long timeoutSec) throws Exception {
+            String consumableId, String pantryId, String uid, String day, long now, long timeoutSec) throws Exception {
         FirebaseFirestore db = dbOrNull(c);
         if (db == null || uid == null || id == null) return;
         DocumentReference home = db.document(HOUSEHOLD);
         Task<?> task;
-        if (WidgetLogic.TARGET_TODO.equals(target)) {
+        if (WidgetLogic.TARGET_PANTRY.equals(target)) {
+            task = usePantryItem(db, home, id, uid, now);
+        } else if (WidgetLogic.TARGET_TODO.equals(target)) {
             boolean done = !wasChecked;
             Map<String, Object> patch = new HashMap<>();
             patch.put("done", done);
@@ -254,6 +270,38 @@ public final class WidgetRepository {
                     Log.w(TAG, "consumable read failed; updating the shopping item only", e);
                 }
             }
+            if (pantryId != null && !pantryId.isEmpty()) {
+                // Same as the web app: a linked pantry item gets its restockQty; unticking takes it back off.
+                DocumentReference pref = home.collection("pantry").document(pantryId);
+                try {
+                    DocumentSnapshot ps = Tasks.await(pref.get(), timeoutSec, TimeUnit.SECONDS);
+                    Double restock = ps.exists() ? num(ps.get("restockQty")) : null;
+                    if (restock != null && restock > 0) {
+                        Double q = num(ps.get("qty"));
+                        long before = q == null ? 0 : Math.round(q);
+                        long amount = WidgetLogic.pantryAmount(restock);
+                        long after = WidgetLogic.pantryAfterShopping(before, amount, bought);
+                        Map<String, Object> pp = new HashMap<>();
+                        pp.put("qty", after);
+                        pp.put("updatedAt", now);
+                        pp.put("updatedBy", uid);
+                        b.update(pref, pp);
+                        Map<String, Object> log = new HashMap<>();
+                        log.put("itemId", pantryId);
+                        log.put("name", str(ps.get("name")));
+                        log.put("op", bought ? "buy" : "use");
+                        log.put("amount", amount);
+                        log.put("before", before);
+                        log.put("after", after);
+                        log.put("by", uid);
+                        log.put("at", now);
+                        log.put("source", "shopping");
+                        b.set(home.collection("pantryLog").document(), log);
+                    }
+                } catch (ExecutionException e) {
+                    Log.w(TAG, "pantry read failed; updating the shopping item only", e);
+                }
+            }
             task = b.commit();
         } else if (WidgetLogic.TARGET_ROUTINE.equals(target)) {
             DocumentReference ref = home.collection("routineLogs").document(WidgetLogic.routineLogId(id, day));
@@ -271,5 +319,44 @@ public final class WidgetRepository {
             return;
         }
         Tasks.await(task, timeoutSec, TimeUnit.SECONDS);
+    }
+
+    /**
+     * The widget's −1, as changePantryQty(op 'use', amount 1, source 'widget') in src/data/actions.ts.
+     * A transaction reads the current count so two quick taps (or both phones) never use the same unit twice.
+     * Unlike plain writes, transactions need the network; offline the refresh afterwards shows the old count.
+     */
+    private static Task<Void> usePantryItem(FirebaseFirestore db, DocumentReference home, String id, final String uid,
+            final long now) {
+        final DocumentReference ref = home.collection("pantry").document(id);
+        final DocumentReference logRef = home.collection("pantryLog").document();
+        return db.runTransaction(new Transaction.Function<Void>() {
+            @Override
+            public Void apply(@NonNull Transaction tx) throws FirebaseFirestoreException {
+                DocumentSnapshot d = tx.get(ref);
+                if (!d.exists()) return null;
+                Double q = num(d.get("qty"));
+                long before = q == null ? 0 : Math.max(0, Math.round(q));
+                if (before <= 0) return null; // already zero: nothing to use, no log line
+                long after = WidgetLogic.pantryAfterUse(before);
+                Map<String, Object> patch = new HashMap<>();
+                patch.put("qty", after);
+                patch.put("updatedAt", now);
+                patch.put("updatedBy", uid);
+                tx.update(ref, patch);
+                Map<String, Object> log = new HashMap<>();
+                log.put("itemId", ref.getId());
+                log.put("name", str(d.get("name")));
+                log.put("op", "use");
+                log.put("amount", 1);
+                log.put("before", before);
+                log.put("after", after);
+                log.put("by", uid);
+                log.put("at", now);
+                log.put("source", "widget");
+                tx.set(logRef, log);
+                return null;
+            }
+        });
     }
 }

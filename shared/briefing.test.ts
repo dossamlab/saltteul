@@ -60,6 +60,30 @@ describe('buildBriefingInput', () => {
   })
 })
 
+describe('pantry in briefings', () => {
+  const withPantry: HouseholdSnapshot = {
+    ...snap,
+    pantry: [
+      { id: 'p1', name: '물티슈', unit: '팩', qty: 1, minQty: 2, restockQty: 10, updatedAt: 0 },
+      { id: 'p2', name: '햇반', unit: '개', qty: 8, minQty: 4, restockQty: 12, updatedAt: 0, expiry: '2026-11-02' },
+      { id: 'p3', name: '휴지', unit: '롤', qty: 20, minQty: 6, restockQty: 30, updatedAt: 0, expiry: '2027-01-01' },
+    ],
+  }
+  it('lists low items and, in the morning, items expiring within 7 days', () => {
+    const m = buildBriefingInput(withPantry, new Date('2026-10-27T22:30:00Z'), 'morning')
+    expect(m.pantryLow).toEqual([{ name: '물티슈', left: '1팩' }])
+    expect(m.pantryExpiring).toEqual([{ name: '햇반', days: 5 }])
+    const e = buildBriefingInput(withPantry, new Date('2026-10-28T11:00:00Z'), 'evening')
+    expect(e.pantryLow).toHaveLength(1)
+    expect(e.pantryExpiring).toEqual([])
+    const t = makeT({ 'brief.fb.pantryLow': '{name} {qty}', 'brief.fb.pantryExpiry': '{name} {days}' })
+    expect(fallbackBriefing(m, t).lines).toEqual(expect.arrayContaining(['물티슈 1팩', '햇반 5']))
+  })
+  it('works without pantry data', () => {
+    expect(buildBriefingInput(snap, new Date('2026-10-27T22:30:00Z'), 'morning').pantryLow).toEqual([])
+  })
+})
+
 describe('fallbackBriefing', () => {
   it('builds lines from copy keys', () => {
     const t = makeT({})

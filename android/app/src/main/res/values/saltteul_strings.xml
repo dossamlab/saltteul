@@ -23,6 +23,15 @@
   <string name="widget_kidsnoteTitle" formatted="false">키즈노트 일정</string>
   <string name="widget_leftCount">%1$s개 남음</string>
   <string name="widget_loading" formatted="false">불러오는 중</string>
+  <string name="widget_pantry_description" formatted="false">햇반, 물티슈처럼 늘 있어야 할 물건을 세고 바로 하나 써요</string>
+  <string name="widget_pantry_name" formatted="false">살뜰 상비품</string>
+  <string name="widget_pantryEmpty" formatted="false">앱의 「우리 집」에서 상비품을 등록해 주세요</string>
+  <string name="widget_pantryExpired" formatted="false">기한 지남</string>
+  <string name="widget_pantryExpirySoon">기한 %1$s일</string>
+  <string name="widget_pantryLow" formatted="false">부족</string>
+  <string name="widget_pantryMinus" formatted="false">하나 쓰기</string>
+  <string name="widget_pantryQty">%1$s%2$s</string>
+  <string name="widget_pantryTitle" formatted="false">상비품</string>
   <string name="widget_routineTitle" formatted="false">오늘 루틴</string>
   <string name="widget_shoppingTitle" formatted="false">장보기</string>
   <string name="widget_signIn" formatted="false">앱을 열어 로그인해 주세요</string>

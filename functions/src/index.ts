@@ -7,7 +7,8 @@ import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/fire
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { dueJobs, isDinnerTime, type Job } from './schedule'
-import type { Nudge } from '../../shared/types'
+import type { Nudge, PantryItem } from '../../shared/types'
+import { handlePantryWrite } from './notify/pantryLow'
 import { GoogleCalendar } from './calendar/client'
 import type { TodoDoc } from './calendar/mapping'
 import { pullCalendar } from './calendar/pull'
@@ -99,6 +100,20 @@ export const widgetPingTodos = widgetPing('todos')
 export const widgetPingShopping = widgetPing('shopping')
 export const widgetPingRoutineLogs = widgetPing('routineLogs')
 export const widgetPingChores = widgetPing('chores')
+
+// Pantry: redraw widgets on every change, and tell the other member once when an item becomes low.
+export const onPantryWritten = onDocumentWritten({ document: 'households/{hid}/pantry/{id}', region: REGION }, async (event) => {
+  if (event.params.hid !== HID || !event.data) return
+  const before = event.data.before.exists ? ({ ...(event.data.before.data() as PantryItem), id: event.params.id }) : null
+  const after = event.data.after.exists ? ({ ...(event.data.after.data() as PantryItem), id: event.params.id }) : null
+  await Promise.all([
+    handlePantryWrite({ db: db(), messaging: messaging(), t }, event.params.id, before, after),
+    // The low-alert bookkeeping write (lowNotifiedAt) does not change what the widget shows.
+    before?.qty === after?.qty && before?.name === after?.name && before?.expiry === after?.expiry && before?.minQty === after?.minQty
+      ? Promise.resolve()
+      : maybePingWidgets(db(), messaging()),
+  ])
+})
 
 // ── Google Calendar (Task 14) ───────────────────────────────────────────────
 

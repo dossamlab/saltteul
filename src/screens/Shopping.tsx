@@ -1,14 +1,48 @@
-import { BellRing, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { BellRing, Package, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { dueSoon } from '../../shared/consumables'
+import { isLow, qtyLabel, sortPantry } from '../../shared/pantry'
 import type { ShoppingItem } from '../../shared/types'
 import { NudgeSheet } from '../components/TodoParts'
 import { Button, Card, CardHeader, Checkbox, Empty, Field, IconButton, Pill, Sheet } from '../components/ui'
 import { t } from '../copy'
-import { addConsumableToShopping, addShopping, clearBought, deleteShopping, toggleShopping, updateShopping } from '../data/actions'
+import { addConsumableToShopping, addPantryToShopping, addShopping, clearBought, deleteShopping, toggleShopping, updateShopping } from '../data/actions'
 import { useHousehold } from '../data/store'
 
+/** Pantry items at or below their minimum that are not on the list yet. */
+function PantrySuggestions() {
+  const h = useHousehold()
+  const inList = new Set(h.shopping.filter((s) => !s.bought).map((s) => s.pantryId).filter(Boolean))
+  const low = sortPantry(h.pantry, h.today).filter((p) => isLow(p) && !inList.has(p.id))
+  if (!low.length) return null
+  return (
+    <Card>
+      <CardHeader title={t('pantry.suggestTitle')} icon={<Package size={16} className="text-terra" />} />
+      {low.map((p) => (
+        <div key={p.id} className="flex items-center gap-3 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px]">{p.name}</p>
+            <p className="text-[12px] text-terra-2">{t('pantry.suggestLine', { name: p.name, qty: qtyLabel(p) })}</p>
+          </div>
+          <Button variant="soft" className="h-9 px-3.5 text-[13px]" onClick={() => addPantryToShopping(h.hid, h.uid, p)}>
+            {t('pantry.addToShopping')}
+          </Button>
+        </div>
+      ))}
+    </Card>
+  )
+}
+
 export function ShoppingSuggestions() {
+  return (
+    <>
+      <PantrySuggestions />
+      <ConsumableSuggestions />
+    </>
+  )
+}
+
+function ConsumableSuggestions() {
   const h = useHousehold()
   const inList = new Set(h.shopping.filter((s) => !s.bought).map((s) => s.consumableId).filter(Boolean))
   const due = dueSoon(h.consumables, h.today, 5).filter((c) => !inList.has(c.id))
@@ -38,7 +72,7 @@ function ShoppingRow({ item, onEdit, onNudge }: { item: ShoppingItem; onEdit: ()
   return (
     <div className="flex items-start gap-3 py-2.5">
       <div className="pt-0.5">
-        <Checkbox checked={item.bought} label={item.name} onChange={() => toggleShopping(h.hid, item, h.uid, h.today, h.consumables)} />
+        <Checkbox checked={item.bought} label={item.name} onChange={() => toggleShopping(h.hid, item, h.uid, h.today, h.consumables, h.pantry)} />
       </div>
       <button type="button" className="min-w-0 flex-1 text-left" onClick={onEdit}>
         <p className={`text-[15px] ${item.bought ? 'done-text' : ''}`}>

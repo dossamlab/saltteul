@@ -45,5 +45,11 @@
   { "key": "brief.fb.weekChore", "where": "기본 주간 미리보기 한 줄. {weekday}는 요일 한 글자", "meaning": "{weekday}요일은 집안일 {title} 차례", "maxChars": 30, "vars": ["title", "weekday"] },
   { "key": "brief.fb.weekEmpty", "where": "기본 주간 미리보기 한 줄(다음 주에 정해진 일이 없을 때)", "meaning": "다음 주는 아직 정해진 일정이 없어 여유로운 한 주", "maxChars": 28 },
 
-  {"key": "push.kidsnoteNotice.title", "where": "키즈노트 공지사항(가정통신문)을 할 일·장보기에 넣은 뒤 보내는 푸시 제목", "meaning": "공지사항을 정리해 넣었다는 소식", "fixed": "공지사항을 정리했어요"}
+  {"key": "push.kidsnoteNotice.title", "where": "키즈노트 공지사항(가정통신문)을 할 일·장보기에 넣은 뒤 보내는 푸시 제목", "meaning": "공지사항을 정리해 넣었다는 소식", "fixed": "공지사항을 정리했어요"},
+
+  {"key": "push.pantryLow.title", "where": "상비품이 부족 기준 아래로 내려갔을 때 다른 사람에게 보내는 푸시 제목", "meaning": "{name}이 떨어져 간다", "fixed": "{name} 부족", "vars": ["name"]},
+  {"key": "push.pantryLow.body", "where": "상비품 부족 푸시 본문", "meaning": "{who}님이 썼고 {qty} 남았다. 장보기에 담아 달라", "fixed": "{who}님이 쓰고 {qty} 남았어요. 장보기에 담아 둘까요?", "vars": ["who", "qty"]},
+  {"key": "push.pantryLow.bodyNoName", "where": "상비품 부족 푸시 본문(누가 썼는지 모를 때)", "meaning": "{qty} 남았다", "fixed": "{qty} 남았어요. 장보기에 담아 둘까요?", "vars": ["qty"]},
+  {"key": "brief.fb.pantryLow", "where": "기본 브리핑 한 줄(상비품 부족)", "meaning": "{name} {qty} 남음", "fixed": "{name} {qty} 남았어요", "vars": ["name", "qty"]},
+  {"key": "brief.fb.pantryExpiry", "where": "기본 브리핑 한 줄(유통기한 임박)", "meaning": "{name} 유통기한 {days}일 남음", "fixed": "{name} 유통기한이 {days}일 남았어요", "vars": ["name", "days"]}
 ]
