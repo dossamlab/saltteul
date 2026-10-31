@@ -33,18 +33,20 @@ describe('dueJobs', () => {
     expect(dueJobs(saturday(20, 0))).toEqual(['calendar', 'kidsnote', 'eveningBriefing'])
     expect(dueJobs(sunday(7, 30))).toEqual(['calendar', 'morningBriefing'])
   })
-  it('suggests dinner at 15:00 on weekdays only', () => {
-    expect(dueJobs(kst(15, 0))).toEqual(['calendar', 'kidsnote', 'dinner'])
-    expect(dueJobs(kst(15, 15))).not.toContain('dinner')
-    expect(dueJobs(saturday(15, 0))).not.toContain('dinner')
-    expect(dueJobs(sunday(15, 0))).not.toContain('dinner')
+  it('makes dinner ideas at 07:00 on weekdays, retrying at 07:15, before the 07:30 briefing', () => {
+    expect(dueJobs(kst(7, 0))).toEqual(['calendar', 'kidsnote', 'dinner'])
+    expect(dueJobs(kst(7, 15))).toEqual(['calendar', 'weather', 'dinner'])
+    expect(dueJobs(kst(7, 30))).not.toContain('dinner')
+    expect(dueJobs(kst(15, 0))).not.toContain('dinner')
+    expect(dueJobs(saturday(7, 0))).not.toContain('dinner')
+    expect(dueJobs(sunday(7, 0))).not.toContain('dinner')
   })
 })
 
 describe('isDinnerTime', () => {
-  it('is true on weekdays from 15:00 KST until midnight', () => {
-    expect(isDinnerTime(kst(14, 59))).toBe(false)
-    expect(isDinnerTime(kst(15, 0))).toBe(true)
+  it('is true on weekdays from 07:00 KST until midnight', () => {
+    expect(isDinnerTime(kst(6, 59))).toBe(false)
+    expect(isDinnerTime(kst(7, 0))).toBe(true)
     expect(isDinnerTime(kst(23, 50))).toBe(true)
     expect(isDinnerTime(saturday(16, 0))).toBe(false)
   })

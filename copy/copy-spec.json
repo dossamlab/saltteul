@@ -443,6 +443,10 @@
     {"key": "widget.pantryExpired", "where": "위젯 유통기한 지남 표시", "meaning": "유통기한이 지남", "fixed": "기한 지남"},
     {"key": "dinner.cardTitle", "where": "홈의 식단 카드 제목", "meaning": "오늘 어린이집에서 먹는 식단", "fixed": "오늘 어린이집 식단"},
     {"key": "dinner.noMenu", "where": "홈 식단 카드(오늘 식단이 없을 때)", "meaning": "오늘 식단이 없다. 우리 집 탭에서 이달 식단표를 올리라", "fixed": "오늘 식단이 없어요. 「우리 집」에서 이달 식단표를 올려 주세요."},
-    {"key": "dinner.suggestToggle", "where": "홈 식단 카드 아래 접힌 저녁 메뉴 추천 버튼", "meaning": "저녁 메뉴 추천 {n}가지 펼치기", "fixed": "저녁 메뉴 추천 {n}가지", "vars": ["n"]}
+    {"key": "dinner.suggestToggle", "where": "홈 식단 카드 아래 접힌 저녁 메뉴 추천 버튼", "meaning": "저녁 메뉴 추천 {n}가지 펼치기", "fixed": "저녁 메뉴 추천 {n}가지", "vars": ["n"]},
+    {"key": "update.banner", "where": "안드로이드 앱 위쪽 새 버전 안내 띠 제목", "meaning": "새 버전 {version}이 나왔다", "fixed": "새 버전 {version}이 나왔어요", "vars": ["version"]},
+    {"key": "update.bannerHint", "where": "새 버전 안내 띠 작은 글씨", "meaning": "받으면 설치 확인이 한 번 뜬다", "fixed": "받으면 설치 확인 창이 한 번 떠요"},
+    {"key": "update.get", "where": "새 버전 안내 띠 버튼", "meaning": "새 앱 받기", "fixed": "받기"},
+    {"key": "update.later", "where": "새 버전 안내 띠 닫기 버튼 설명", "meaning": "이 버전은 나중에", "fixed": "나중에"}
   ]
 }

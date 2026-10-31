@@ -51,5 +51,6 @@
   {"key": "push.pantryLow.body", "where": "상비품 부족 푸시 본문", "meaning": "{who}님이 썼고 {qty} 남았다. 장보기에 담아 달라", "fixed": "{who}님이 쓰고 {qty} 남았어요. 장보기에 담아 둘까요?", "vars": ["who", "qty"]},
   {"key": "push.pantryLow.bodyNoName", "where": "상비품 부족 푸시 본문(누가 썼는지 모를 때)", "meaning": "{qty} 남았다", "fixed": "{qty} 남았어요. 장보기에 담아 둘까요?", "vars": ["qty"]},
   {"key": "brief.fb.pantryLow", "where": "기본 브리핑 한 줄(상비품 부족)", "meaning": "{name} {qty} 남음", "fixed": "{name} {qty} 남았어요", "vars": ["name", "qty"]},
-  {"key": "brief.fb.pantryExpiry", "where": "기본 브리핑 한 줄(유통기한 임박)", "meaning": "{name} 유통기한 {days}일 남음", "fixed": "{name} 유통기한이 {days}일 남았어요", "vars": ["name", "days"]}
+  {"key": "brief.fb.pantryExpiry", "where": "기본 브리핑 한 줄(유통기한 임박)", "meaning": "{name} 유통기한 {days}일 남음", "fixed": "{name} 유통기한이 {days}일 남았어요", "vars": ["name", "days"]},
+  {"key": "brief.fb.dinner", "where": "기본 아침 브리핑 마지막 줄(오늘 저녁 메뉴 추천)", "meaning": "저녁 추천 메뉴 이름들", "fixed": "저녁 추천: {names}", "vars": ["names"]}
 ]

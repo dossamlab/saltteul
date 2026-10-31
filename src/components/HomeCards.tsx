@@ -1,17 +1,12 @@
-import {
-  Cake, ChevronDown, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, Loader2, ShoppingBasket, Sparkles, Sun, Undo2,
-  UtensilsCrossed,
-} from 'lucide-react'
-import { useState } from 'react'
+import { Cake, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, Sparkles, Sun, Undo2, UtensilsCrossed } from 'lucide-react'
 import { togetherDays, upcoming } from '../../shared/anniversaries'
-import type { Briefing, DinnerOption, WeatherDay } from '../../shared/types'
+import type { Briefing, WeatherDay } from '../../shared/types'
 import { t } from '../copy'
-import { addShopping, undoKidsnoteBatch } from '../data/actions'
-import { missingIngredients } from '../data/pure'
+import { undoKidsnoteBatch } from '../data/actions'
 import { useHousehold } from '../data/store'
 import { dDayLabel, formatDay, relativeDay } from '../format'
 import { KidsnoteHistoryButton } from './KidsnoteHistory'
-import { Button, Card, CardHeader, Empty, Pill } from './ui'
+import { Card, CardHeader, Empty, Pill } from './ui'
 
 const SLOT_KEY: Record<Briefing['slot'], string> = { morning: 'brief.morning', evening: 'brief.evening', weekly: 'brief.weekly' }
 
@@ -135,52 +130,14 @@ export function AnniversaryCard({ className = '' }: { className?: string }) {
   )
 }
 
-function DinnerOptionRow({ option }: { option: DinnerOption }) {
-  const h = useHousehold()
-  const [state, setState] = useState<{ busy: boolean; msg: string }>({ busy: false, msg: '' })
-  const addIngredients = async () => {
-    const open = h.shopping.filter((s) => !s.bought).map((s) => s.name)
-    const missing = missingIngredients(option.ingredients, open)
-    setState({ busy: true, msg: '' })
-    try {
-      await Promise.all(missing.map((name) => addShopping(h.hid, h.uid, name, { note: option.name })))
-      setState({ busy: false, msg: missing.length ? t('dinner.added', { n: missing.length }) : t('dinner.allThere') })
-    } catch {
-      setState({ busy: false, msg: t('dinner.addFailed') })
-    }
-  }
-  return (
-    <div className="py-3 first:pt-1">
-      <p className="text-[15px] font-semibold text-ink">{option.name}</p>
-      <p className="mt-0.5 text-[13px] leading-snug text-ink-2">{option.why}</p>
-      <div className="mt-2 flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-ink-3">
-          {state.msg ? <span role="status" className="font-semibold text-sage">{state.msg}</span> : option.ingredients.join(', ')}
-        </p>
-        <Button variant="soft" className="h-8 shrink-0 px-3 text-[12px]" disabled={state.busy} onClick={addIngredients}>
-          {state.busy ? <Loader2 size={14} className="animate-spin" /> : <ShoppingBasket size={14} />}
-          {t('dinner.addIngredients')}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Today's daycare meals (from the uploaded monthly sheet) shown first; the dinner ideas that avoid them stay folded
- * until opened.
- */
+/** Today's daycare meals from the uploaded monthly sheet. Dinner ideas go out in the 07:30 morning briefing. */
 export function DinnerCard({ className = '' }: { className?: string }) {
   const h = useHousehold()
-  const [open, setOpen] = useState(false)
-  const d = h.dinner
   const m = h.todayMenu
-  // The sheet is the source; the copy kept on the dinner doc covers a sheet deleted after 15:00.
   const rows: [string, string[]][] = m
     ? [['menu.lunch', m.lunch], ['menu.morningSnack', m.morningSnack], ['menu.afternoonSnack', m.afternoonSnack]]
-    : d?.daycareMenu ? [['dinner.daycareLunch', d.daycareMenu.lunch], ['dinner.daycareSnack', d.daycareMenu.snack]] : []
+    : []
   const shown = rows.filter(([, items]) => items?.length)
-  const options = d?.options.slice(0, 3) ?? []
   return (
     <Card className={className}>
       <CardHeader title={t('dinner.cardTitle')} icon={<UtensilsCrossed size={17} className="text-terra" />} />
@@ -194,16 +151,6 @@ export function DinnerCard({ className = '' }: { className?: string }) {
           ))}
         </div>
       ) : <Empty>{t('dinner.noMenu')}</Empty>}
-      <div className="mt-3 border-t border-line pt-2">
-        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}
-          className="flex w-full items-center gap-2 py-1.5 text-left text-[14px] font-semibold text-ink-2">
-          <span className="flex-1">{options.length ? t('dinner.suggestToggle', { n: options.length }) : t('dinner.title')}</span>
-          <ChevronDown size={18} className={`text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </button>
-        {open && (options.length
-          ? <div className="divide-y divide-line">{options.map((o) => <DinnerOptionRow key={o.name} option={o} />)}</div>
-          : <p className="py-2 text-[13px] text-ink-2">{t('dinner.empty')}</p>)}
-      </div>
     </Card>
   )
 }

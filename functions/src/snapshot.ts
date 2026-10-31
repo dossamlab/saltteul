@@ -1,7 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore'
 import type { HouseholdSnapshot } from '../../shared/briefingInput'
 import { addDays, householdDate } from '../../shared/householdDate'
-import type { Settings } from '../../shared/types'
+import type { DinnerSuggestion, Settings } from '../../shared/types'
 import { DEFAULT_SETTINGS, HID } from './household'
 
 async function all<T>(db: Firestore, coll: string): Promise<T[]> {
@@ -29,6 +29,7 @@ export async function loadSnapshot(db: Firestore, now: Date): Promise<HouseholdS
     all<NonNullable<HouseholdSnapshot['pantry']>[number]>(db, 'pantry'),
     loadSettings(db),
   ])
+  const dinnerSnap = await db.doc(`households/${HID}/dinner/${householdDate(now)}`).get()
   return {
     members,
     todos,
@@ -39,6 +40,7 @@ export async function loadSnapshot(db: Firestore, now: Date): Promise<HouseholdS
     anniversaries,
     consumables,
     pantry,
+    dinner: dinnerSnap.exists ? (dinnerSnap.data() as DinnerSuggestion) : null,
     settings,
   }
 }

@@ -40,6 +40,7 @@ export function fallbackBriefing(i: BriefingInput, t: T): { headline: string; li
   }
   for (const p of i.pantryLow ?? []) lines.push(t('brief.fb.pantryLow', { name: p.name, qty: p.left }))
   for (const p of i.pantryExpiring ?? []) lines.push(t('brief.fb.pantryExpiry', { name: p.name, days: Math.max(p.days, 0) }))
+  if (i.dinnerIdeas?.length) lines.push(t('brief.fb.dinner', { names: i.dinnerIdeas.join(', ') }))
   if (lines.length === 0) lines.push(t('brief.fb.empty'))
 
   return { headline: t(i.slot === 'morning' ? 'brief.fb.headlineMorning' : 'brief.fb.headlineEvening'), lines }

@@ -5,7 +5,7 @@ import { addDays, householdDate } from './householdDate'
 import { daysToExpiry, expiresSoon, isLow, qtyLabel, sortPantry } from './pantry'
 import { isRoutineDone, routinesForDay } from './routines'
 import type {
-  Anniversary, Chore, Consumable, Member, Owner, PantryItem, PrepItem, Routine, RoutineLog, Settings, ShoppingItem, Todo, WeatherDay, Ymd,
+  Anniversary, Chore, Consumable, DinnerSuggestion, Member, Owner, PantryItem, PrepItem, Routine, RoutineLog, Settings, ShoppingItem, Todo, WeatherDay, Ymd,
 } from './types'
 
 export interface HouseholdSnapshot {
@@ -19,6 +19,8 @@ export interface HouseholdSnapshot {
   consumables: Consumable[]
   /** Pantry (상비품); optional so older snapshots and tests stay valid. */
   pantry?: PantryItem[]
+  /** Today's dinner ideas (made at 07:00 on weekdays); optional like pantry. */
+  dinner?: DinnerSuggestion | null
   settings: Settings
 }
 
@@ -48,6 +50,8 @@ export interface BriefingInput {
   pantryLow: { name: string; left: string }[]
   /** morning only: pantry items whose expiry is within 7 days (days < 0 = past). */
   pantryExpiring: { name: string; days: number }[]
+  /** morning only: today's dinner ideas, dish names. */
+  dinnerIdeas: string[]
   shoppingLeft: string[]
 }
 
@@ -100,6 +104,7 @@ export function buildBriefingInput(s: HouseholdSnapshot, now: Date, slot: 'morni
       slot === 'morning'
         ? sortPantry(s.pantry ?? [], day).filter((p) => expiresSoon(p, day)).map((p) => ({ name: p.name, days: daysToExpiry(p, day)! }))
         : [],
+    dinnerIdeas: slot === 'morning' && s.dinner?.day === day ? (s.dinner.options ?? []).map((o) => o.name).filter(Boolean) : [],
     shoppingLeft: s.shopping.filter((i) => !i.bought).map((i) => i.name),
   }
 }
@@ -109,6 +114,6 @@ export function isEmptyBriefing(i: BriefingInput): boolean {
   return (
     i.focusTodos.length === 0 && i.todayLeft.length === 0 && i.routinesLeft.length === 0 &&
     i.chores.length === 0 && i.anniversaries.length === 0 && i.consumablesDue.length === 0 &&
-    i.pantryLow.length === 0 && i.pantryExpiring.length === 0 && !i.weather
+    i.pantryLow.length === 0 && i.pantryExpiring.length === 0 && i.dinnerIdeas.length === 0 && !i.weather
   )
 }

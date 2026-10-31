@@ -2,6 +2,7 @@ import { ArrowLeft, Bell, CheckSquare, Home, House, Settings2, ShoppingBasket } 
 import { useEffect, useState, type ReactNode } from 'react'
 import { togetherDays } from '../shared/anniversaries'
 import { QuickCapture } from './components/QuickCapture'
+import { UpdateBanner } from './components/UpdateBanner'
 import { IconButton } from './components/ui'
 import { t } from './copy'
 import { useHousehold } from './data/store'
@@ -204,7 +205,7 @@ export function Shell() {
         </nav>
         <div className="min-w-0 flex-1">
           {header}
-          <main className="mx-auto max-w-[1400px] px-6 pb-10">{body}</main>
+          <main className="mx-auto max-w-[1400px] px-6 pb-10"><UpdateBanner />{body}</main>
         </div>
       </div>
     )
@@ -213,7 +214,7 @@ export function Shell() {
   return (
     <div className="min-h-full">
       {header}
-      <main className="mx-auto max-w-xl px-5 pb-36">{body}</main>
+      <main className="mx-auto max-w-xl px-5 pb-36"><UpdateBanner />{body}</main>
       {!overlay && <QuickCapture variant="fab" />}
       {!overlay && (
         <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 backdrop-blur-xl">

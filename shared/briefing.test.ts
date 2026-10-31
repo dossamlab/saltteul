@@ -79,6 +79,21 @@ describe('pantry in briefings', () => {
     const t = makeT({ 'brief.fb.pantryLow': '{name} {qty}', 'brief.fb.pantryExpiry': '{name} {days}' })
     expect(fallbackBriefing(m, t).lines).toEqual(expect.arrayContaining(['물티슈 1팩', '햇반 5']))
   })
+  it('puts today\'s dinner ideas in the morning briefing only', () => {
+    const withDinner: HouseholdSnapshot = {
+      ...snap,
+      dinner: { id: '2026-10-28', day: '2026-10-28', daycareMenu: null, createdAt: 0, model: 'm', options: [
+        { name: '소고기 뭇국', why: '', ingredients: [] }, { name: '고등어구이', why: '', ingredients: [] },
+      ] },
+    }
+    const m = buildBriefingInput(withDinner, new Date('2026-10-27T22:30:00Z'), 'morning')
+    expect(m.dinnerIdeas).toEqual(['소고기 뭇국', '고등어구이'])
+    expect(buildBriefingInput(withDinner, new Date('2026-10-28T11:00:00Z'), 'evening').dinnerIdeas).toEqual([])
+    // Yesterday's ideas are not repeated.
+    expect(buildBriefingInput({ ...withDinner, dinner: { ...withDinner.dinner!, day: '2026-10-27' } }, new Date('2026-10-27T22:30:00Z'), 'morning').dinnerIdeas).toEqual([])
+    const t = makeT({ 'brief.fb.dinner': 'dinner: {names}' })
+    expect(fallbackBriefing(m, t).lines).toContain('dinner: 소고기 뭇국, 고등어구이')
+  })
   it('works without pantry data', () => {
     expect(buildBriefingInput(snap, new Date('2026-10-27T22:30:00Z'), 'morning').pantryLow).toEqual([])
   })

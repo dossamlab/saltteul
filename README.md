@@ -16,7 +16,7 @@
 6. 클로드 브리핑: 매일 07:30·20:00, 일요일 저녁 주간 미리보기
 7. 빠른 입력: 「내일 3시 소아과, 우유 2개」처럼 한 줄로 적거나 말하면 할 일·장보기로 나눠 제안. 가정통신문 사진·PDF도 읽음
 8. 키즈노트: 알림장과 공지사항에서 일정·준비물·마감을 뽑아 넣고, 한 번에 되돌릴 수 있음. 주마다 알림장으로 성장 기록을 씀
-9. 저녁 메뉴: 어린이집 월간 식단표 사진을 올려 두면, 평일 오후에 앞뒤 며칠 식단과 겹치지 않는 저녁 메뉴 세 가지를 추천
+9. 어린이집 식단과 저녁 메뉴: 월간 식단표 사진을 올려 두면 홈에 오늘 점심·간식이 보이고, 평일 아침 브리핑에서 앞뒤 며칠 식단과 겹치지 않는 저녁 메뉴 세 가지를 추천
 10. 배우자에게 부탁 알림 보내기
 
 ## 구성
@@ -62,9 +62,9 @@
 ## 업데이트 방식
 
 - 화면만 바뀐 경우: 웹에 배포하면 끝납니다. 안드로이드 앱은 켜질 때 `app-update/latest.json`을 읽어 새 화면 묶음을 받고, 다음에 앱을 다시 열 때 적용합니다(`src/pwa/liveUpdate.ts`, Capgo 업데이터를 자체 호스팅으로 사용). 아이폰 웹앱은 원래 웹을 따라 바뀝니다.
-- 안드로이드 본체가 바뀐 경우(위젯, 권한, 플러그인): `v0.3.1` 같은 태그를 올리면 GitHub Actions가 서명된 APK를 만들어 Releases에 붙입니다(`.github/workflows/android-release.yml`). 휴대폰의 [Obtainium](https://github.com/ImranR98/Obtainium)에 이 저장소를 등록해 두면 새 버전을 알려 줍니다. 이때 화면 묶음이 새 본체를 요구하면 `scripts/update-config.json`의 `minNative`를 올립니다.
+- 안드로이드 본체가 바뀐 경우(위젯, 권한, 플러그인): `v0.3.1` 같은 태그를 올리면 GitHub Actions가 서명된 APK를 만들어 Releases에 붙입니다(`.github/workflows/android-release.yml`). 앱이 켜질 때 최신 Release를 확인해 더 새 판이 있으면 화면 위에 「새 버전이 나왔어요 [받기]」 띠를 띄웁니다(`src/components/UpdateBanner.tsx`). [Obtainium](https://github.com/ImranR98/Obtainium)에 이 저장소를 등록해 받아도 됩니다. 이때 화면 묶음이 새 본체를 요구하면 `scripts/update-config.json`의 `minNative`를 올립니다.
 
-이 저장소를 가져다 쓰려면 `src/pwa/liveUpdate.ts`의 `UPDATE_MANIFEST_URL`을 자기 웹 주소로 바꿔야 합니다.
+이 저장소를 가져다 쓰려면 `src/pwa/liveUpdate.ts`의 `UPDATE_MANIFEST_URL`을 자기 웹 주소로, `src/pwa/apkRelease.ts`의 `RELEASES_API`를 자기 저장소로 바꿔야 합니다.
 
 ## 알아 둘 점
 
