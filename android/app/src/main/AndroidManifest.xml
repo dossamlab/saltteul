@@ -72,18 +72,6 @@
                 android:resource="@xml/widget_tablet_info" />
         </receiver>
 
-        <receiver
-            android:name=".widget.PantryWidget"
-            android:exported="false"
-            android:label="@string/widget_pantry_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_pantry_info" />
-        </receiver>
-
         <service
             android:name=".widget.WidgetListService"
             android:exported="false"

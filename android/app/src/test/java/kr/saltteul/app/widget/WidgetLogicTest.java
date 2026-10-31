@@ -272,7 +272,7 @@ public class WidgetLogicTest {
         s.pantry.add(new Snapshot.Pantry("past", "a", "", 5, 1, "2026-10-20"));
         s.pantry.add(new Snapshot.Pantry("today", "b", "", 5, 1, "2026-10-28"));
         s.pantry.add(new Snapshot.Pantry("week", "c", "", 5, 1, "2026-11-04"));
-        List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_PANTRY, today);
+        List<WidgetLogic.Row> rows = pantryRows(WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, today));
         assertEquals("past", rows.get(0).id);
         assertTrue(rows.get(0).expired);
         assertEquals("today", rows.get(1).id);
@@ -280,10 +280,13 @@ public class WidgetLogicTest {
         assertEquals(Integer.valueOf(0), rows.get(1).expiryDays);
         assertFalse(rows.get(2).expired);
         assertEquals(Integer.valueOf(7), rows.get(2).expiryDays);
-        // The tablet section uses the same rows.
-        for (WidgetLogic.Row r : WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, today)) {
-            if ("past".equals(r.id)) assertTrue(r.expired);
-        }
+    }
+
+    /** The tablet's pantry rows, in order. */
+    private static List<WidgetLogic.Row> pantryRows(List<WidgetLogic.Row> rows) {
+        List<WidgetLogic.Row> out = new ArrayList<>();
+        for (WidgetLogic.Row r : rows) if (WidgetLogic.TARGET_PANTRY.equals(r.target)) out.add(r);
+        return out;
     }
 
     @Test
@@ -365,18 +368,19 @@ public class WidgetLogicTest {
     }
 
     @Test
-    public void rows_pantryWidgetListsEverythingSorted() {
+    public void rows_tabletPantryRowFields() {
         Snapshot s = sample();
         s.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, null));
         s.pantry.add(new Snapshot.Pantry("low", "c", "pack", 1, 1, "2026-10-26"));
         s.pantry.add(new Snapshot.Pantry("soon", "a", "bag", 9, 1, "2026-10-31"));
-        List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_PANTRY, "2026-10-28");
+        List<WidgetLogic.Row> rows = pantryRows(WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28"));
         assertEquals(3, rows.size());
         WidgetLogic.Row low = rows.get(0);
         assertEquals("low", low.id);
         assertEquals(WidgetLogic.TARGET_PANTRY, low.target);
         assertTrue(low.low);
         assertEquals(Integer.valueOf(-2), low.expiryDays);
+        assertTrue(low.expired);
         assertEquals(1, low.qty);
         WidgetLogic.Row soon = rows.get(1);
         assertEquals("soon", soon.id);
@@ -386,13 +390,10 @@ public class WidgetLogicTest {
         WidgetLogic.Row ok = rows.get(2);
         assertNull(ok.expiryDays);
         assertEquals("개", ok.unit);
-        // No pantry items: no rows (the widget shows widget_pantryEmpty).
-        assertEquals(0, WidgetLogic.buildRows(sample(), WidgetLogic.KIND_PANTRY, "2026-10-28").size());
-        assertEquals(0, WidgetLogic.buildRows(Snapshot.signedOut(0), WidgetLogic.KIND_PANTRY, "2026-10-28").size());
     }
 
     @Test
-    public void rows_tabletPantrySectionOnlyLowOrExpiring() {
+    public void rows_tabletPantrySectionListsAllItemsCappedAtEight() {
         Snapshot s = sample();
         s.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, "2027-01-01"));
         s.pantry.add(new Snapshot.Pantry("low", "c", "", 0, 1, null));
@@ -400,17 +401,26 @@ public class WidgetLogicTest {
         List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28");
         List<String> keys = new ArrayList<>();
         for (WidgetLogic.Row r : rows) keys.add(r.type == WidgetLogic.Row.SECTION ? "#" + r.key : r.id);
+        // Items that are neither low nor expiring show too, after the others.
         assertEquals(Arrays.asList(
                 "#today", "b", "a",
                 "#routine", "r1", "r2", "r3",
                 "#kidsnote", "k1",
                 "#shopping", "s1", "s2",
-                "#pantry", "low", "soon"), keys);
+                "#pantry", "low", "soon", "ok"), keys);
 
-        // Nothing low or expiring: no pantry section at all.
-        Snapshot calm = sample();
-        calm.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, null));
-        for (WidgetLogic.Row r : WidgetLogic.buildRows(calm, WidgetLogic.KIND_TABLET, "2026-10-28")) {
+        // Ten calm items: the section shows the first eight by name.
+        Snapshot many = sample();
+        for (int i = 9; i >= 0; i--) many.pantry.add(new Snapshot.Pantry("p" + i, "n" + i, "", 5, 1, null));
+        many.pantry.add(new Snapshot.Pantry("lowLast", "z", "", 1, 1, null));
+        List<WidgetLogic.Row> pr = pantryRows(WidgetLogic.buildRows(many, WidgetLogic.KIND_TABLET, "2026-10-28"));
+        assertEquals(8, pr.size());
+        assertEquals("lowLast", pr.get(0).id); // low first even though its name sorts last
+        assertEquals("p0", pr.get(1).id);
+        assertEquals("p6", pr.get(7).id);
+
+        // No pantry items: no pantry section at all.
+        for (WidgetLogic.Row r : WidgetLogic.buildRows(sample(), WidgetLogic.KIND_TABLET, "2026-10-28")) {
             assertFalse(WidgetLogic.SECTION_PANTRY.equals(r.key) || WidgetLogic.TARGET_PANTRY.equals(r.target));
         }
     }

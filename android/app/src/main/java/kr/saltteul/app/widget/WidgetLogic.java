@@ -22,7 +22,6 @@ public final class WidgetLogic {
     public static final String KIND_DASHBOARD = "dashboard";
     public static final String KIND_TODO = "todo";
     public static final String KIND_TABLET = "tablet";
-    public static final String KIND_PANTRY = "pantry";
 
     public static final String TARGET_TODO = "todo";
     public static final String TARGET_ROUTINE = "routine";
@@ -42,7 +41,7 @@ public final class WidgetLogic {
     static final int TABLET_TODOS = 6;
     static final int TABLET_KIDSNOTE = 3;
     static final int TABLET_SHOPPING = 6;
-    static final int TABLET_PANTRY = 6;
+    static final int TABLET_PANTRY = 8;
 
     /** Expiry within this many days (or already past) shows a badge (shared/pantry.ts EXPIRY_SOON_DAYS). */
     static final int EXPIRY_SOON_DAYS = 7;
@@ -276,13 +275,6 @@ public final class WidgetLogic {
                 return c != 0 ? c : ko.compare(nz(a.name), nz(b.name));
             }
         });
-        return out;
-    }
-
-    /** Low or expiring-soon items, in pantry order (the tablet only shows these). */
-    public static List<Snapshot.Pantry> pantryAlerts(Snapshot s, String today) {
-        List<Snapshot.Pantry> out = new ArrayList<>();
-        for (Snapshot.Pantry p : sortPantry(s.pantry, today)) if (pantryRank(p, today) < 2) out.add(p);
         return out;
     }
 
@@ -543,14 +535,12 @@ public final class WidgetLogic {
                 rows.add(Row.section(SECTION_SHOPPING));
                 for (int i = 0; i < shop.size() && i < TABLET_SHOPPING; i++) rows.add(Row.shop(shop.get(i)));
             }
-            List<Snapshot.Pantry> pantry = pantryAlerts(s, day);
+            // Every pantry item in pantry order (low, expiring, name), capped like the other sections.
+            List<Snapshot.Pantry> pantry = sortPantry(s.pantry, day);
             if (!pantry.isEmpty()) {
                 rows.add(Row.section(SECTION_PANTRY));
                 for (int i = 0; i < pantry.size() && i < TABLET_PANTRY; i++) rows.add(Row.pantry(pantry.get(i), day));
             }
-        } else if (KIND_PANTRY.equals(kind)) {
-            // Every item; the list scrolls. Empty list shows widget_pantryEmpty.
-            for (Snapshot.Pantry p : sortPantry(s.pantry, day)) rows.add(Row.pantry(p, day));
         }
         return rows;
     }
