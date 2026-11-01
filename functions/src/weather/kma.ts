@@ -1,5 +1,5 @@
 import { addDays, seoulDate } from '../../../shared/householdDate'
-import type { WeatherDay, Ymd } from '../../../shared/types'
+import type { WeatherDay, WeatherHour, Ymd } from '../../../shared/types'
 
 /** One row of the getVilageFcst response. */
 export interface KmaItem {
@@ -70,6 +70,20 @@ export function parseVillageForecast(items: KmaItem[], today: Ymd): ParsedDay[] 
     if (pty.length) skyOut = PTY_SKY[mostCommon(pty)!]
     else if (sky.length) skyOut = SKY_SKY[mostCommon(sky)!]
 
+    // One entry per forecast hour that has a temperature; precipitation type wins over cloud cover.
+    const times = [...new Set(by('TMP').map((r) => r.fcstTime))].sort()
+    const at = (cat: string, time: string) => rows.find((r) => r.category === cat && r.fcstTime === time)?.fcstValue
+    const hours: WeatherHour[] = times.map((time) => {
+      const ptyV = at('PTY', time)
+      const skyV = at('SKY', time)
+      return {
+        time: `${time.slice(0, 2)}:00`,
+        tempC: num(at('TMP', time)),
+        sky: ptyV && ptyV !== '0' && PTY_SKY[ptyV] ? PTY_SKY[ptyV] : skyV && SKY_SKY[skyV] ? SKY_SKY[skyV] : null,
+        pop: num(at('POP', time)),
+      }
+    })
+
     return {
       day,
       minC: tmn ?? (tmp.length ? Math.min(...tmp) : null),
@@ -77,6 +91,7 @@ export function parseVillageForecast(items: KmaItem[], today: Ymd): ParsedDay[] 
       popMax: pops.length ? Math.max(...pops.map((p) => p.v)) : null,
       sky: skyOut,
       rainFrom: rain ? `${rain.time.slice(0, 2)}:00` : null,
+      hours,
       exactMin: tmn !== null,
       exactMax: tmx !== null,
     }
@@ -104,6 +119,8 @@ export function mergeWeather(prev: WeatherDay[] | undefined | null, next: Parsed
       popMax: pick(n.popMax, p.popMax, Math.max),
       sky: n.sky ?? p.sky,
       rainFrom: n.rainFrom ?? p.rainFrom ?? null,
+      // Later runs drop the hours already past; nothing needs them, so the newest list is kept.
+      hours: n.hours?.length ? n.hours : p.hours ?? [],
     }
   })
 }
@@ -127,7 +144,16 @@ export class KmaWeather implements WeatherPort {
       nx: String(nx),
       ny: String(ny),
     })
-    const res = await this.fetchFn(`${KMA_ENDPOINT}?serviceKey=${encodeURIComponent(this.serviceKey)}&${q.toString()}`)
+    let res: Response
+    try {
+      res = await this.fetchFn(`${KMA_ENDPOINT}?serviceKey=${encodeURIComponent(this.serviceKey)}&${q.toString()}`, {
+        signal: AbortSignal.timeout(20000),
+      })
+    } catch (e) {
+      // "fetch failed" alone says nothing; keep the low-level cause (DNS, reset, TLS ...) but never the URL (it has the key).
+      const cause = (e as { cause?: { code?: string; message?: string } }).cause
+      throw new Error(`KMA unreachable: ${cause?.code ?? cause?.message ?? (e instanceof Error ? e.name : 'error')}`)
+    }
     if (!res.ok) throw new Error(`KMA HTTP ${res.status}`)
     const text = await res.text()
     let j: { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: { items?: { item?: KmaItem[] } } } }

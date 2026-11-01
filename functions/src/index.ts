@@ -34,7 +34,8 @@ import { QuickInputError, runQuickAdd } from './quickadd/quickAdd'
 import { GoogleSpeech, runTranscribe, SpeechInputError } from './speech/transcribe'
 import { householdDate } from '../../shared/householdDate'
 import { KmaWeather } from './weather/kma'
-import { pollWeather as pollKma } from './weather/poll'
+import { OpenMeteoWeather } from './weather/openMeteo'
+import { pollWeather as pollKma, refreshWeather as refreshWeatherNow } from './weather/poll'
 
 if (getApps().length === 0) initializeApp()
 
@@ -239,7 +240,14 @@ const runKidsnotePoll = () =>
 
 // ── Weather (Task 17) ───────────────────────────────────────────────────────
 
-const runWeatherPoll = () => pollKma(db(), new KmaWeather(KMA_SERVICE_KEY.value()))
+const openMeteo = new OpenMeteoWeather()
+const runWeatherPoll = () => pollKma(db(), new KmaWeather(KMA_SERVICE_KEY.value()), new Date(), openMeteo, log)
+
+/** refreshWeather() → { status, updatedAt }. Called when the app opens and from the weather card; no Claude. */
+export const refreshWeather = onCall({ region: REGION, timeoutSeconds: 60, secrets: [KMA_SERVICE_KEY] }, async (req) => {
+  await memberOrThrow(req.auth?.uid)
+  return refreshWeatherNow(db(), new KmaWeather(KMA_SERVICE_KEY.value()), openMeteo, new Date(), log)
+})
 
 // ── One scheduler job for all periodic work (stays within the 3 free Cloud Scheduler jobs) ──
 

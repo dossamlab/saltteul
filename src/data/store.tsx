@@ -8,6 +8,7 @@ import type {
 import { useReadySession } from '../auth/session'
 import { t } from '../copy'
 import { db } from '../firebase'
+import { refreshWeather } from './actions'
 
 export interface HouseholdData {
   loaded: boolean
@@ -101,6 +102,21 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     }),
     [base],
   )
+
+  // Weather is fetched when the app opens and whenever it comes back to the front (the server skips the fetch when the
+  // stored forecast is under 10 minutes old, so this is cheap). The result arrives through settings/main.
+  useEffect(() => {
+    let last = 0
+    const ask = () => {
+      if (Date.now() - last < 60_000) return
+      last = Date.now()
+      void refreshWeather().catch(() => undefined)
+    }
+    ask()
+    const onVisible = () => document.visibilityState === 'visible' && ask()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [base])
 
   useEffect(
     () => onSnapshot(doc(db, `${base}/dinner/${today}`), (d) => {

@@ -1,8 +1,10 @@
-import { Cake, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, Sparkles, Sun, Undo2, UtensilsCrossed } from 'lucide-react'
+import { Cake, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, RefreshCw, Sparkles, Sun, Undo2, UtensilsCrossed } from 'lucide-react'
+import { useState } from 'react'
 import { togetherDays, upcoming } from '../../shared/anniversaries'
+import { seoulDate, seoulTime } from '../../shared/householdDate'
 import type { Briefing, WeatherDay } from '../../shared/types'
 import { t } from '../copy'
-import { undoKidsnoteBatch } from '../data/actions'
+import { refreshWeather, undoKidsnoteBatch } from '../data/actions'
 import { useHousehold } from '../data/store'
 import { dDayLabel, formatDay, relativeDay } from '../format'
 import { KidsnoteHistoryButton } from './KidsnoteHistory'
@@ -46,9 +48,41 @@ const SKY_ICON: Record<NonNullable<WeatherDay['sky']>, typeof Sun> = {
   clear: Sun, partly: CloudSun, cloudy: Cloud, rain: CloudDrizzle, shower: CloudDrizzle, snow: CloudSnow, rainsnow: CloudSnow,
 }
 
+/** Hours from the current hour today through the end of tomorrow, each marked with its day. */
+function upcomingHours(days: WeatherDay[], today: string, nowHour: number) {
+  return days.flatMap((d, di) =>
+    (d.hours ?? [])
+      .filter((x) => d.day > today || Number(x.time.slice(0, 2)) >= nowHour)
+      .map((x) => ({ ...x, day: d.day, firstOfDay: false, di })),
+  ).map((x, i, all) => ({ ...x, firstOfDay: i > 0 && all[i - 1].day !== x.day }))
+}
+
+/**
+ * Today and tomorrow by calendar date (not the 4 a.m. household day, so the night shows the right "today"), the hourly
+ * forecast, and a refresh that asks the server to fetch again (it reuses a forecast younger than 10 minutes).
+ */
 export function WeatherCard({ className = '' }: { className?: string }) {
   const h = useHousehold()
-  const days = h.settings.weather?.days ?? []
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const now = new Date()
+  const today = seoulDate(now)
+  const nowHour = Number(seoulTime(now).slice(0, 2))
+  const w = h.settings.weather
+  const days = (w?.days ?? []).filter((d) => d.day >= today).slice(0, 2)
+  const hours = upcomingHours(days, today, nowHour)
+  const refresh = async () => {
+    setBusy(true)
+    setFailed(false)
+    try {
+      const { data } = await refreshWeather()
+      setFailed(data.status === 'failed')
+    } catch {
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
   if (!h.settings.location) {
     return (
       <Card className={className}>
@@ -59,14 +93,22 @@ export function WeatherCard({ className = '' }: { className?: string }) {
   }
   return (
     <Card className={className}>
-      <CardHeader title={t('weather.title')} action={<span className="text-[12px] text-ink-2">{h.settings.location.label}</span>} />
+      <CardHeader title={t('weather.title')} action={(
+        <div className="flex items-center gap-2 text-[12px] text-ink-2">
+          <span>{h.settings.location.label}</span>
+          <button type="button" onClick={refresh} disabled={busy} aria-label={t('weather.refresh')} title={t('weather.refresh')}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-ink-2 disabled:opacity-60">
+            <RefreshCw size={15} className={busy ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      )} />
       {days.length === 0 && <Empty>{t('weather.loading')}</Empty>}
       <div className="grid grid-cols-2 gap-2.5">
-        {days.slice(0, 2).map((d) => {
+        {days.map((d) => {
           const Icon = d.sky ? SKY_ICON[d.sky] : Cloud
           return (
             <div key={d.day} className="rounded-[var(--radius-field)] bg-muted p-3">
-              <p className="text-[12px] font-semibold text-ink-2">{relativeDay(d.day, h.today)}</p>
+              <p className="text-[12px] font-semibold text-ink-2">{relativeDay(d.day, today)}</p>
               <div className="mt-1 flex items-center gap-2">
                 <Icon size={26} className="text-sage" />
                 <p className="text-[15px] font-semibold">
@@ -80,6 +122,28 @@ export function WeatherCard({ className = '' }: { className?: string }) {
           )
         })}
       </div>
+      {hours.length > 0 && (
+        <div className="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+          {hours.map((x) => {
+            const Icon = x.sky ? SKY_ICON[x.sky] : Cloud
+            const hour = Number(x.time.slice(0, 2))
+            return (
+              <div key={`${x.day}-${x.time}`}
+                className={`flex w-12 shrink-0 flex-col items-center gap-0.5 rounded-xl py-1.5 text-center ${x.firstOfDay ? 'border-l border-line pl-1' : ''}`}>
+                <span className="text-[11px] text-ink-2">
+                  {x.firstOfDay ? t('weather.tomorrowShort') : t('weather.hour', { h: hour })}
+                </span>
+                <Icon size={18} className="text-sage" />
+                <span className="text-[13px] font-semibold text-ink">{x.tempC ?? '-'}°</span>
+                <span className={`text-[10px] ${(x.pop ?? 0) >= 60 ? 'font-semibold text-terra-2' : 'text-ink-3'}`}>{x.pop ?? 0}%</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-ink-3">
+        {failed ? t('weather.refreshFailed') : w?.updatedAt ? t('weather.updatedAt', { time: seoulTime(new Date(w.updatedAt)) }) : ''}
+      </p>
     </Card>
   )
 }

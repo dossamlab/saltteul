@@ -447,6 +447,11 @@
     {"key": "update.banner", "where": "안드로이드 앱 위쪽 새 버전 안내 띠 제목", "meaning": "새 버전 {version}이 나왔다", "fixed": "새 버전 {version}이 나왔어요", "vars": ["version"]},
     {"key": "update.bannerHint", "where": "새 버전 안내 띠 작은 글씨", "meaning": "받으면 설치 확인이 한 번 뜬다", "fixed": "받으면 설치 확인 창이 한 번 떠요"},
     {"key": "update.get", "where": "새 버전 안내 띠 버튼", "meaning": "새 앱 받기", "fixed": "받기"},
-    {"key": "update.later", "where": "새 버전 안내 띠 닫기 버튼 설명", "meaning": "이 버전은 나중에", "fixed": "나중에"}
+    {"key": "update.later", "where": "새 버전 안내 띠 닫기 버튼 설명", "meaning": "이 버전은 나중에", "fixed": "나중에"},
+    {"key": "weather.refresh", "where": "날씨 카드 새로고침 버튼 설명", "meaning": "날씨 다시 받아오기", "fixed": "날씨 새로고침"},
+    {"key": "weather.updatedAt", "where": "날씨 카드 아래 작은 글씨", "meaning": "{time}에 받아온 예보", "fixed": "{time} 기준", "vars": ["time"]},
+    {"key": "weather.refreshFailed", "where": "날씨 새로고침 실패 안내", "meaning": "지금은 날씨를 받아오지 못했다. 이전 예보를 보여 준다", "fixed": "지금은 날씨를 받아오지 못했어요. 이전 예보를 보여 드려요."},
+    {"key": "weather.hour", "where": "시간별 날씨의 시각", "meaning": "{h}시", "fixed": "{h}시", "vars": ["h"]},
+    {"key": "weather.tomorrowShort", "where": "시간별 날씨에서 내일이 시작되는 자리(0시 대신)", "meaning": "내일", "fixed": "내일"}
   ]
 }

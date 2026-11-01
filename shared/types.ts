@@ -174,6 +174,15 @@ export interface WeatherDay {
   popMax: number | null // precipitation probability %
   sky: 'clear' | 'partly' | 'cloudy' | 'rain' | 'snow' | 'rainsnow' | 'shower' | null
   rainFrom?: string | null // 'HH:00' first hour with PoP >= 60
+  /** Hourly forecast of the day, earliest first (hours already past may be missing). */
+  hours?: WeatherHour[]
+}
+
+export interface WeatherHour {
+  time: string // 'HH:00'
+  tempC: number | null
+  sky: WeatherDay['sky']
+  pop: number | null // precipitation probability %
 }
 
 export interface Settings {
@@ -181,7 +190,8 @@ export interface Settings {
   location?: { label: string; lat: number; lon: number } | null
   briefingTimes: { morning: string; evening: string }
   calendarId?: string | null
-  weather?: { updatedAt: number; days: WeatherDay[] } | null
+  /** Written by the server; source says whether KMA or the Open-Meteo fallback supplied it. */
+  weather?: { updatedAt: number; days: WeatherDay[]; source?: 'kma' | 'open-meteo' } | null
   /** The child's Kids Note class chosen in settings; null/absent = the class Kids Note has on record. */
   kidsnoteClassId?: string | null
 }

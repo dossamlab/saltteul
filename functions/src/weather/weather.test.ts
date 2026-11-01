@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { FakeFirestore } from '../testing/fakeFirestore'
 import { kmaBaseTime, mergeWeather, parseVillageForecast, type KmaItem, type WeatherPort } from './kma'
-import { pollWeather } from './poll'
+import { parseOpenMeteo, skyFromWmo, type FallbackWeatherPort } from './openMeteo'
+import { pollWeather, refreshWeather } from './poll'
 
 const row = (category: string, fcstDate: string, fcstTime: string, fcstValue: string): KmaItem => ({ category, fcstDate, fcstTime, fcstValue })
 
@@ -36,18 +37,30 @@ describe('kmaBaseTime', () => {
 describe('parseVillageForecast', () => {
   it('builds today and tomorrow', () => {
     const [today, tomorrow] = parseVillageForecast(FIXTURE, '2026-10-28')
-    expect(today).toEqual({
+    expect(today).toMatchObject({
       day: '2026-10-28', minC: 12, maxC: 21, popMax: 70, sky: 'rain', rainFrom: '12:00', exactMin: false, exactMax: true,
     })
-    expect(tomorrow).toEqual({
+    expect(tomorrow).toMatchObject({
       day: '2026-10-29', minC: 5, maxC: 15, popMax: 30, sky: 'partly', rainFrom: null, exactMin: true, exactMax: true,
     })
+  })
+  it('lists each forecast hour with temperature, sky (precipitation first) and rain chance', () => {
+    const [today, tomorrow] = parseVillageForecast(FIXTURE, '2026-10-28')
+    expect(today.hours).toEqual([
+      { time: '09:00', tempC: 12, sky: 'clear', pop: 20 },
+      { time: '12:00', tempC: 18, sky: 'rain', pop: 60 },
+      { time: '15:00', tempC: 20, sky: 'shower', pop: 70 },
+    ])
+    expect(tomorrow.hours).toEqual([
+      { time: '06:00', tempC: 6, sky: 'partly', pop: 10 },
+      { time: '15:00', tempC: 14, sky: null, pop: null },
+    ])
   })
   it('maps every precipitation type and returns nulls for missing data', () => {
     const one = (pty: string) => parseVillageForecast([row('PTY', '20261028', '0900', pty)], '2026-10-28')[0].sky
     expect([one('1'), one('2'), one('3'), one('4')]).toEqual(['rain', 'rainsnow', 'snow', 'shower'])
     expect(parseVillageForecast([], '2026-10-28')[1]).toEqual({
-      day: '2026-10-29', minC: null, maxC: null, popMax: null, sky: null, rainFrom: null, exactMin: false, exactMax: false,
+      day: '2026-10-29', minC: null, maxC: null, popMax: null, sky: null, rainFrom: null, hours: [], exactMin: false, exactMax: false,
     })
   })
 })
@@ -59,8 +72,9 @@ describe('mergeWeather', () => {
       { day: '2026-10-29', minC: 1, maxC: 20, popMax: 90, sky: 'rain' as const, rainFrom: '09:00' },
     ]
     const [today, tomorrow] = mergeWeather(prev, parseVillageForecast(FIXTURE, '2026-10-28'), '2026-10-28')
-    expect(today).toEqual({ day: '2026-10-28', minC: 8, maxC: 21, popMax: 80, sky: 'rain', rainFrom: '12:00' })
-    expect(tomorrow).toEqual({ day: '2026-10-29', minC: 5, maxC: 15, popMax: 30, sky: 'partly', rainFrom: null })
+    expect(today).toMatchObject({ day: '2026-10-28', minC: 8, maxC: 21, popMax: 80, sky: 'rain', rainFrom: '12:00' })
+    expect(today.hours).toHaveLength(3)
+    expect(tomorrow).toMatchObject({ day: '2026-10-29', minC: 5, maxC: 15, popMax: 30, sky: 'partly', rainFrom: null })
   })
 })
 
@@ -86,5 +100,67 @@ describe('pollWeather', () => {
     db.put('households/home/settings/main', { location: { label: 'x', lat: 37.5, lon: 127 } })
     expect(await pollWeather(db.asAdmin, failing)).toBe('failed')
     expect(db.read('households/home/integrations/weather')).toMatchObject({ consecutiveFailures: 1, lastError: 'KMA HTTP 500' })
+  })
+})
+
+describe('Open-Meteo fallback', () => {
+  const om = {
+    hourly: {
+      time: ['2026-10-28T09:00', '2026-10-28T10:00', '2026-10-29T09:00', '2026-10-30T09:00'],
+      temperature_2m: [11.6, 13.2, 7.4, 1],
+      precipitation_probability: [20, 70, 0, 0],
+      weather_code: [1, 61, 0, 0],
+    },
+    daily: { time: ['2026-10-28', '2026-10-29'], temperature_2m_min: [8.4, 5], temperature_2m_max: [17.5, 15], precipitation_probability_max: [70, 0] },
+  }
+  it('maps WMO codes and builds the same day shape as KMA', () => {
+    expect([0, 2, 3, 45, 61, 66, 71, 80, 86, 95].map(skyFromWmo)).toEqual(['clear', 'partly', 'cloudy', 'cloudy', 'rain', 'rain', 'snow', 'shower', 'snow', 'shower'])
+    const [today, tomorrow] = parseOpenMeteo(om, '2026-10-28')
+    expect(today).toEqual({
+      day: '2026-10-28', minC: 8, maxC: 18, popMax: 70, sky: 'rain', rainFrom: '10:00', exactMin: true, exactMax: true,
+      hours: [{ time: '09:00', tempC: 12, sky: 'partly', pop: 20 }, { time: '10:00', tempC: 13, sky: 'rain', pop: 70 }],
+    })
+    expect(tomorrow).toMatchObject({ day: '2026-10-29', minC: 5, maxC: 15, sky: 'clear', hours: [{ time: '09:00', tempC: 7, sky: 'clear', pop: 0 }] })
+  })
+
+  it('is used when KMA cannot be reached, keeping the source', async () => {
+    const db = new FakeFirestore()
+    db.put('households/home/settings/main', { location: { label: 'x', lat: 37.5, lon: 127 } })
+    const failing: WeatherPort = { async fetchVillageForecast() { throw new Error('KMA unreachable: ECONNRESET') } }
+    const fallback: FallbackWeatherPort = { async fetchDays(_lat, _lon, today) { return parseOpenMeteo(om, today) } }
+    expect(await pollWeather(db.asAdmin, failing, new Date('2026-10-28T03:00:00Z'), fallback)).toBe('ok')
+    expect(db.read('households/home/settings/main')?.weather).toMatchObject({ source: 'open-meteo', days: [{ day: '2026-10-28' }, { day: '2026-10-29' }] })
+    expect(db.read('households/home/integrations/weather')).toMatchObject({ consecutiveFailures: 0 })
+  })
+})
+
+describe('refreshWeather', () => {
+  it('reuses a forecast younger than 10 minutes and fetches otherwise', async () => {
+    const db = new FakeFirestore()
+    const now = new Date('2026-10-28T03:00:00Z')
+    db.put('households/home/settings/main', {
+      location: { label: 'x', lat: 37.5665, lon: 126.978 },
+      weather: { updatedAt: now.getTime() - 5 * 60_000, days: [{ day: '2026-10-28' }] },
+    })
+    let calls = 0
+    const port: WeatherPort = { async fetchVillageForecast() { calls++; return FIXTURE } }
+    const fallback: FallbackWeatherPort = { async fetchDays() { throw new Error('unused') } }
+    expect(await refreshWeather(db.asAdmin, port, fallback, now)).toEqual({ status: 'fresh', updatedAt: now.getTime() - 5 * 60_000 })
+    expect(calls).toBe(0)
+    const later = new Date(now.getTime() + 6 * 60_000)
+    expect(await refreshWeather(db.asAdmin, port, fallback, later)).toEqual({ status: 'ok', updatedAt: later.getTime() })
+    expect(calls).toBe(1)
+  })
+
+  it('fetches again after midnight even if the stored forecast is recent', async () => {
+    const db = new FakeFirestore()
+    const justAfterMidnight = new Date('2026-10-28T15:02:00Z') // 10-29 00:02 KST
+    db.put('households/home/settings/main', {
+      location: { label: 'x', lat: 37.5665, lon: 126.978 },
+      weather: { updatedAt: justAfterMidnight.getTime() - 3 * 60_000, days: [{ day: '2026-10-28' }] },
+    })
+    const port: WeatherPort = { async fetchVillageForecast() { return FIXTURE } }
+    const fallback: FallbackWeatherPort = { async fetchDays() { throw new Error('unused') } }
+    expect((await refreshWeather(db.asAdmin, port, fallback, justAfterMidnight)).status).toBe('ok')
   })
 })

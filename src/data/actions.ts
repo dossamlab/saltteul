@@ -181,6 +181,9 @@ export const extractMenu = (p: { month: string; fileName: string; mimeType: stri
 export function saveMonthlyMenu(hid: string, uid: string, month: string, days: MonthlyMenu['days']) {
   return setDoc(ref(hid, 'menus', month), { id: month, month, days, updatedAt: now(), updatedBy: uid } satisfies MonthlyMenu)
 }
+/** Server fetches the forecast unless it is less than 10 minutes old; no Claude involved. */
+export const refreshWeather = () =>
+  httpsCallable<void, { status: 'fresh' | 'ok' | 'failed' | 'no-location'; updatedAt: number | null }>(functions, 'refreshWeather', { timeout: 60_000 })()
 export const transcribe = (p: { audioBase64: string; sampleRate: number }) =>
   httpsCallable<typeof p, { text: string }>(functions, 'transcribe', { timeout: 60_000 })(p)
 export const extractFromFile = (p: { fileName: string; mimeType: string; dataBase64: string }) =>
