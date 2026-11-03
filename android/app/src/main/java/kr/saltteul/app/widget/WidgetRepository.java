@@ -38,6 +38,8 @@ public final class WidgetRepository {
     private static final String KEY_SNAPSHOT = "snapshot";
     private static final String KEY_LAST_ATTEMPT = "lastAttempt";
     private static final String KEY_FAILURES = "failures";
+    private static final String KEY_UNDO_ROUTINE = "undoRoutine";
+    private static final String KEY_UNDO_AT = "undoRoutineAt";
     /** The household id is fixed for this two-person app. */
     static final String HOUSEHOLD = "households/home";
 
@@ -71,6 +73,17 @@ public final class WidgetRepository {
 
     static void setFailures(Context c, int n) {
         prefs(c).edit().putInt(KEY_FAILURES, n).apply();
+    }
+
+    /** A routine ticked on a widget (the tablet board offers to undo it for a while); a null id forgets it. */
+    static void rememberRoutineTick(Context c, String routineId, long at) {
+        if (routineId == null) prefs(c).edit().remove(KEY_UNDO_ROUTINE).remove(KEY_UNDO_AT).apply();
+        else prefs(c).edit().putString(KEY_UNDO_ROUTINE, routineId).putLong(KEY_UNDO_AT, at).apply();
+    }
+
+    static String undoRoutine(Context c, long now) {
+        SharedPreferences p = prefs(c);
+        return WidgetLogic.undoRoutine(p.getString(KEY_UNDO_ROUTINE, null), p.getLong(KEY_UNDO_AT, 0), now);
     }
 
     // ---------- Firebase access (never throws) ----------

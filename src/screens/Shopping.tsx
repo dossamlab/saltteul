@@ -1,12 +1,12 @@
-import { BellRing, Package, Plus, Sparkles, Trash2 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { BellRing, Package, Sparkles, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { dueSoon } from '../../shared/consumables'
 import { isLow, qtyLabel, sortPantry } from '../../shared/pantry'
 import type { ShoppingItem } from '../../shared/types'
 import { NudgeSheet } from '../components/TodoParts'
 import { Button, Card, CardHeader, Checkbox, Empty, Field, IconButton, Pill, Sheet } from '../components/ui'
 import { t } from '../copy'
-import { addConsumableToShopping, addPantryToShopping, addShopping, clearBought, deleteShopping, toggleShopping, updateShopping } from '../data/actions'
+import { addConsumableToShopping, addPantryToShopping, clearBought, deleteShopping, toggleShopping, updateShopping } from '../data/actions'
 import { useHousehold } from '../data/store'
 
 /** Pantry items at or below their minimum that are not on the list yet. */
@@ -126,26 +126,6 @@ function EditSheet({ item, onClose }: { item: ShoppingItem | null; onClose: () =
   )
 }
 
-export function QuickAdd() {
-  const h = useHousehold()
-  const [name, setName] = useState('')
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    await addShopping(h.hid, h.uid, name)
-    setName('')
-  }
-  return (
-    <form onSubmit={submit} className="flex gap-2">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('shop.quickPlaceholder')} aria-label={t('shop.quickPlaceholder')}
-        className="h-12 min-w-0 flex-1 rounded-full border border-sand bg-white px-4 text-[15px] outline-none placeholder:text-ink-3 focus:border-sage" />
-      <Button type="submit" className="w-12 px-0" aria-label={t('action.add')} disabled={!name.trim()}>
-        <Plus size={20} />
-      </Button>
-    </form>
-  )
-}
-
 /** part: 'all' = open list and bought list; 'open' / 'bought' = just one of them (PC puts them in different columns). */
 export function ShoppingList({ part = 'all' }: { part?: 'all' | 'open' | 'bought' }) {
   const h = useHousehold()
@@ -187,7 +167,6 @@ export function ShoppingScreen({ wide = false }: { wide?: boolean }) {
     return (
       <div className="mx-auto grid max-w-[1200px] grid-cols-3 items-start gap-5">
         <div className="col-span-2 flex flex-col gap-4">
-          <QuickAdd />
           <ShoppingList part="open" />
         </div>
         <div className="flex flex-col gap-4">
@@ -199,7 +178,6 @@ export function ShoppingScreen({ wide = false }: { wide?: boolean }) {
   }
   return (
     <div className="flex flex-col gap-4">
-      <QuickAdd />
       <ShoppingSuggestions />
       <ShoppingList />
     </div>

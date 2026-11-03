@@ -187,18 +187,77 @@ public class WidgetLogicTest {
         for (WidgetLogic.Row r : rows) assertEquals(WidgetLogic.TARGET_TODO, r.target);
     }
 
+    /** Rows as short keys: "#section", item ids, "!note:count", "^undo-id". */
+    private static List<String> keys(List<WidgetLogic.Row> rows) {
+        List<String> keys = new ArrayList<>();
+        for (WidgetLogic.Row r : rows) {
+            if (r.type == WidgetLogic.Row.SECTION) keys.add("#" + r.key);
+            else if (r.type == WidgetLogic.Row.NOTE) keys.add("!" + r.key + ":" + r.count);
+            else if (r.type == WidgetLogic.Row.UNDO) keys.add("^" + r.id);
+            else keys.add(r.id);
+        }
+        return keys;
+    }
+
     @Test
-    public void rows_tabletHasSections() {
+    public void rows_tabletHasSectionsAndHidesDoneRoutines() {
         Snapshot s = sample();
         List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28");
-        List<String> keys = new ArrayList<>();
-        for (WidgetLogic.Row r : rows) keys.add(r.type == WidgetLogic.Row.SECTION ? "#" + r.key : r.id);
         assertEquals(Arrays.asList(
                 "#today", "b", "a",
-                "#routine", "r1", "r2", "r3",
+                "#routine", "r1", "r3",
                 "#kidsnote", "k1",
-                "#shopping", "s1", "s2"), keys);
-        assertTrue(rows.get(5).checked); // r2 done today
+                "#shopping", "s1", "s2"), keys(rows));
+        // The routine section title carries done/total: 1 of 3 (r2 done today).
+        assertEquals(1, rows.get(3).count);
+        assertEquals(3, rows.get(3).total);
+    }
+
+    @Test
+    public void rows_tabletColumnsSplitTheBoard() {
+        Snapshot s = sample();
+        assertEquals(Arrays.asList("#today", "b", "a", "#routine", "r1", "r3"),
+                keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_LEFT, null)));
+        assertEquals(Arrays.asList("#kidsnote", "k1", "#shopping", "s1", "s2"),
+                keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_RIGHT, null)));
+        assertEquals(keys(WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28")),
+                keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_ALL, null)));
+    }
+
+    @Test
+    public void rows_tabletUndoLineForARoutineTickedOnTheWidget() {
+        Snapshot s = sample();
+        // r2 is done today: the undo line follows the open routines and unticks r2 when tapped.
+        List<WidgetLogic.Row> rows = WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_LEFT, "r2");
+        assertEquals(Arrays.asList("#today", "b", "a", "#routine", "r1", "r3", "^r2"), keys(rows));
+        WidgetLogic.Row undo = rows.get(6);
+        assertEquals(WidgetLogic.TARGET_ROUTINE, undo.target);
+        assertTrue(undo.checked);
+        // Not done (already undone in the app) or not today's routine: no undo line.
+        assertFalse(keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_LEFT, "r1")).contains("^r1"));
+        assertFalse(keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_LEFT, "gone")).contains("^gone"));
+    }
+
+    @Test
+    public void undoRoutine_onlyWithinThirtyMinutes() {
+        long t = at("2026-10-28T00:00:00Z");
+        assertEquals("r1", WidgetLogic.undoRoutine("r1", t, t));
+        assertEquals("r1", WidgetLogic.undoRoutine("r1", t, t + WidgetLogic.ROUTINE_UNDO_MS));
+        assertNull(WidgetLogic.undoRoutine("r1", t, t + WidgetLogic.ROUTINE_UNDO_MS + 1));
+        assertNull(WidgetLogic.undoRoutine("r1", t, t - 1));
+        assertNull(WidgetLogic.undoRoutine(null, t, t));
+        assertNull(WidgetLogic.undoRoutine("r1", 0, t));
+    }
+
+    @Test
+    public void rows_tabletCappedSectionsEndWithMore() {
+        Snapshot s = sample();
+        for (int i = 0; i < 7; i++) s.todos.add(new Snapshot.Todo("x" + i, "t" + i, "2026-10-28", null, "both", "manual"));
+        for (int i = 0; i < 8; i++) s.shopping.add(new Snapshot.Shop("sh" + i, "n" + i, null, 30 + i));
+        List<String> left = keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_LEFT, null));
+        assertEquals("!more:3", left.get(7)); // 9 open todos, 6 shown
+        List<String> right = keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_RIGHT, null));
+        assertEquals("!more:4", right.get(right.size() - 1)); // 10 open items, 6 shown
     }
 
     @Test
@@ -374,7 +433,7 @@ public class WidgetLogicTest {
         s.pantry.add(new Snapshot.Pantry("low", "c", "pack", 1, 1, "2026-10-26"));
         s.pantry.add(new Snapshot.Pantry("soon", "a", "bag", 9, 1, "2026-10-31"));
         List<WidgetLogic.Row> rows = pantryRows(WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28"));
-        assertEquals(3, rows.size());
+        assertEquals(2, rows.size()); // "ok" is neither low nor expiring
         WidgetLogic.Row low = rows.get(0);
         assertEquals("low", low.id);
         assertEquals(WidgetLogic.TARGET_PANTRY, low.target);
@@ -387,37 +446,34 @@ public class WidgetLogicTest {
         assertFalse(soon.low);
         assertEquals(Integer.valueOf(3), soon.expiryDays);
         assertEquals("bag", soon.unit);
-        WidgetLogic.Row ok = rows.get(2);
-        assertNull(ok.expiryDays);
-        assertEquals("개", ok.unit);
+        assertEquals("개", WidgetLogic.Row.pantry(new Snapshot.Pantry("ok", "b", "", 5, 1, null), "2026-10-28").unit);
     }
 
     @Test
-    public void rows_tabletPantrySectionListsAllItemsCappedAtEight() {
+    public void rows_tabletPantryShowsOnlyLowOrExpiringAndCountsTheRest() {
         Snapshot s = sample();
         s.pantry.add(new Snapshot.Pantry("ok", "b", "", 5, 1, "2027-01-01"));
         s.pantry.add(new Snapshot.Pantry("low", "c", "", 0, 1, null));
         s.pantry.add(new Snapshot.Pantry("soon", "a", "", 9, 1, "2026-11-01"));
-        List<WidgetLogic.Row> rows = WidgetLogic.buildRows(s, WidgetLogic.KIND_TABLET, "2026-10-28");
-        List<String> keys = new ArrayList<>();
-        for (WidgetLogic.Row r : rows) keys.add(r.type == WidgetLogic.Row.SECTION ? "#" + r.key : r.id);
-        // Items that are neither low nor expiring show too, after the others.
         assertEquals(Arrays.asList(
-                "#today", "b", "a",
-                "#routine", "r1", "r2", "r3",
                 "#kidsnote", "k1",
                 "#shopping", "s1", "s2",
-                "#pantry", "low", "soon", "ok"), keys);
+                "#pantry", "low", "soon", "!pantryEnough:1"),
+                keys(WidgetLogic.tabletRows(s, "2026-10-28", WidgetLogic.COLUMN_RIGHT, null)));
 
-        // Ten calm items: the section shows the first eight by name.
+        // Everything calm: the section is just the count line.
+        Snapshot calm = sample();
+        for (int i = 0; i < 10; i++) calm.pantry.add(new Snapshot.Pantry("p" + i, "n" + i, "", 5, 1, null));
+        List<String> calmKeys = keys(WidgetLogic.tabletRows(calm, "2026-10-28", WidgetLogic.COLUMN_RIGHT, null));
+        assertEquals(Arrays.asList("#pantry", "!pantryEnough:10"), calmKeys.subList(calmKeys.size() - 2, calmKeys.size()));
+
+        // Ten low items: eight rows, then "+2 more".
         Snapshot many = sample();
-        for (int i = 9; i >= 0; i--) many.pantry.add(new Snapshot.Pantry("p" + i, "n" + i, "", 5, 1, null));
-        many.pantry.add(new Snapshot.Pantry("lowLast", "z", "", 1, 1, null));
-        List<WidgetLogic.Row> pr = pantryRows(WidgetLogic.buildRows(many, WidgetLogic.KIND_TABLET, "2026-10-28"));
-        assertEquals(8, pr.size());
-        assertEquals("lowLast", pr.get(0).id); // low first even though its name sorts last
-        assertEquals("p0", pr.get(1).id);
-        assertEquals("p6", pr.get(7).id);
+        for (int i = 9; i >= 0; i--) many.pantry.add(new Snapshot.Pantry("p" + i, "n" + i, "", 0, 1, null));
+        List<WidgetLogic.Row> rows = WidgetLogic.tabletRows(many, "2026-10-28", WidgetLogic.COLUMN_RIGHT, null);
+        assertEquals(8, pantryRows(rows).size());
+        assertEquals("p0", pantryRows(rows).get(0).id);
+        assertEquals("!more:2", keys(rows).get(keys(rows).size() - 1));
 
         // No pantry items: no pantry section at all.
         for (WidgetLogic.Row r : WidgetLogic.buildRows(sample(), WidgetLogic.KIND_TABLET, "2026-10-28")) {

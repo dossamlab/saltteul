@@ -19,7 +19,8 @@ async function noHorizontalScroll(page: Page) {
 
 test('home shows briefing, weather and today', async ({ page }, info) => {
   await login(page)
-  await expect(page.getByText(T['home.todayTitle'])).toBeVisible()
+  const phone = info.project.name === 'phone'
+  await expect(page.getByText(phone ? T['home.todayCardTitle'] : T['home.todayTitle'], { exact: true }).first()).toBeVisible()
   await expect(page.getByText('자동차 정기검사 예약').first()).toBeVisible()
   await noHorizontalScroll(page)
   await page.screenshot({ path: `reviews/screens/${info.project.name}-home.png`, fullPage: true })
@@ -43,14 +44,19 @@ test('routine check, chore and shopping flows', async ({ page }, info) => {
   await page.screenshot({ path: `reviews/screens/${info.project.name}-chores.png`, fullPage: true })
 
   await nav.getByText(T['tab.shopping']).click()
-  const name = `시험 품목 ${Date.now() % 10000}`
-  await page.getByPlaceholder(T['shop.quickPlaceholder']).fill(name)
-  await page.keyboard.press('Enter')
-  await expect(page.getByText(name)).toBeVisible()
-  await page.getByRole('checkbox', { name }).click()
-  await expect(page.getByRole('checkbox', { name })).toHaveAttribute('aria-checked', 'true')
+  // One place to type on the shopping tab: the quick-add line, no separate shopping box.
+  await expect(page.getByRole('textbox', { name: T['quick.title'] })).toHaveCount(1)
+  const item = page.getByRole('checkbox', { name: '애호박' })
+  const was = await item.getAttribute('aria-checked')
+  await item.click()
+  await expect(item).toHaveAttribute('aria-checked', was === 'true' ? 'false' : 'true')
   await noHorizontalScroll(page)
   await page.screenshot({ path: `reviews/screens/${info.project.name}-shopping.png`, fullPage: true })
+
+  await nav.getByText(T['tab.kids']).click()
+  await expect(page.getByText(T['kidsnote.cardTitle'])).toBeVisible()
+  await noHorizontalScroll(page)
+  await page.screenshot({ path: `reviews/screens/${info.project.name}-kids.png`, fullPage: true })
 
   await nav.getByText(T['tab.ourhome']).click()
   await expect(page.getByText('결혼기념일')).toBeVisible()
@@ -66,8 +72,9 @@ test('partner sees a change made by the other member', async ({ browser }) => {
     const phone = (p.viewportSize()?.width ?? 0) < 900
     await (phone ? p.locator('nav').last() : p.locator('nav').first()).getByText(T['tab.shopping']).click()
   }
-  const name = `공유 시험 ${Date.now() % 10000}`
-  await a.getByPlaceholder(T['shop.quickPlaceholder']).fill(name)
-  await a.keyboard.press('Enter')
-  await expect(b.getByText(name)).toBeVisible({ timeout: 10_000 })
+  const mine = a.getByRole('checkbox', { name: '우유 1L' })
+  const theirs = b.getByRole('checkbox', { name: '우유 1L' })
+  const was = await theirs.getAttribute('aria-checked')
+  await mine.click()
+  await expect(theirs).toHaveAttribute('aria-checked', was === 'true' ? 'false' : 'true', { timeout: 10_000 })
 })

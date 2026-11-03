@@ -40,6 +40,10 @@ public class ToggleReceiver extends BroadcastReceiver {
         final long now = System.currentTimeMillis();
         final String day = WidgetLogic.householdDate(now);
 
+        if (WidgetLogic.TARGET_ROUTINE.equals(target)) {
+            // Ticking offers an undo on the tablet board; unticking (from that line or the checkbox) clears it.
+            WidgetRepository.rememberRoutineTick(c, wasChecked ? null : id, now);
+        }
         try {
             Snapshot s = WidgetRepository.loadCache(c);
             if (s != null) {

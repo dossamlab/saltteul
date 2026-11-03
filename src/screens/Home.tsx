@@ -1,5 +1,6 @@
-import { ChevronRight, ShoppingBasket } from 'lucide-react'
+import { Baby, ChevronRight, ShoppingBasket } from 'lucide-react'
 import { useState } from 'react'
+import { choreStatus } from '../../shared/chores'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
 import type { Todo } from '../../shared/types'
 import { AnniversaryCard, AnniversaryStrip, BriefingCard, DinnerCard, KidsnoteCard, WeatherCard } from '../components/HomeCards'
@@ -9,10 +10,10 @@ import { Card, CardHeader, Checkbox, Empty } from '../components/ui'
 import { t } from '../copy'
 import { toggleShopping } from '../data/actions'
 import { useHousehold } from '../data/store'
-import { ShoppingList, ShoppingSuggestions, QuickAdd } from './Shopping'
+import { ShoppingList, ShoppingSuggestions } from './Shopping'
 import { sortTodos, type TodoSection } from './Todos'
 
-export type Go = (tab: 'home' | 'todos' | 'shopping' | 'ourhome', section?: TodoSection) => void
+export type Go = (tab: 'home' | 'todos' | 'shopping' | 'kids' | 'ourhome', section?: TodoSection) => void
 
 function MoreLink({ onClick }: { onClick: () => void }) {
   return (
@@ -106,8 +107,80 @@ function ShoppingHomeCard({ go, className }: { go: Go; className?: string }) {
       {open.length > shown.length && (
         <p className="pt-1 text-[12px] text-ink-2">{t('shop.moreItems', { n: open.length - shown.length })}</p>
       )}
-      <div className="mt-auto pt-3"><QuickAdd /></div>
     </Card>
+  )
+}
+
+function GroupLabel({ title, onMore, first }: { title: string; onMore: () => void; first: boolean }) {
+  return (
+    <div className={`flex items-center justify-between ${first ? '' : 'mt-3 border-t border-line pt-3'}`}>
+      <p className="text-[13px] font-semibold text-ink-2">{title}</p>
+      <MoreLink onClick={onMore} />
+    </div>
+  )
+}
+
+/** Phone home: today's open todos, routines not done yet and chores due, in one card. Finished ones show as counts. */
+function TodayAllCard({ go }: { go: Go }) {
+  const h = useHousehold()
+  const [editing, setEditing] = useState<Todo | null>(null)
+  const [nudge, setNudge] = useState<Todo | null>(null)
+  const todos = h.todos.filter((x) => x.date === h.today)
+  const openTodos = sortTodos(todos.filter((x) => !x.done)).slice(0, 4)
+  const routines = routinesForDay(h.routines, h.today)
+  const routinesDone = routines.filter((r) => isRoutineDone(h.routineLogs, r.id, h.today)).length
+  const choresDue = h.chores.filter((c) => choreStatus(c, h.today).kind !== 'left').length
+  const progress = [
+    t('home.todoProgress', { done: todos.length - todos.filter((x) => !x.done).length, total: todos.length }),
+    routines.length ? t('home.routineProgress', { done: routinesDone, total: routines.length }) : '',
+  ].filter(Boolean).join(' · ')
+  const routinesLeft = routinesDone < routines.length
+  const nothingLeft = !openTodos.length && !routinesLeft && !choresDue
+  return (
+    <Card>
+      <CardHeader title={t('home.todayCardTitle')} action={<span className="text-[12px] text-ink-2">{progress}</span>} />
+      {nothingLeft && <Empty>{todos.length ? t('home.todayAllDone') : t('todo.emptyDay')}</Empty>}
+      {openTodos.length > 0 && (
+        <>
+          <GroupLabel first title={t('todos.tab.today')} onMore={() => go('todos', 'today')} />
+          <div className="divide-y divide-line">
+            {openTodos.map((x) => <TodoRow key={x.id} todo={x} onEdit={setEditing} onNudge={setNudge} />)}
+          </div>
+        </>
+      )}
+      {routinesLeft && (
+        <>
+          <GroupLabel first={!openTodos.length} title={t('todos.tab.routines')} onMore={() => go('todos', 'routines')} />
+          <RoutineChecklist compact />
+        </>
+      )}
+      {choresDue > 0 && (
+        <>
+          <GroupLabel first={!openTodos.length && !routinesLeft} title={t('todos.tab.chores')} onMore={() => go('todos', 'chores')} />
+          <ChoreList compact />
+        </>
+      )}
+      <TodoSheet open={!!editing} onClose={() => setEditing(null)} todo={editing} />
+      <NudgeSheet target={nudge && { type: 'todo', id: nudge.id, title: nudge.title }} onClose={() => setNudge(null)} />
+    </Card>
+  )
+}
+
+/** Phone home: one line about the child (upcoming Kids Note events, today's lunch) that opens the child tab. */
+function KidsLine({ go }: { go: Go }) {
+  const h = useHousehold()
+  const events = h.todos.filter((x) => x.source === 'kidsnote' && x.date && x.date >= h.today && !x.done).length
+  const lunch = h.todayMenu?.lunch?.join(', ')
+  return (
+    <button type="button" onClick={() => go('kids')}
+      className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-card px-5 py-4 text-left shadow-[var(--shadow-card)]">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lavender/60 text-wisteria"><Baby size={18} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold text-ink">{events ? t('home.kidsEvents', { n: events }) : t('home.kidsNoEvents')}</span>
+        {lunch && <span className="block truncate text-[13px] text-ink-2">{t('home.kidsLunch', { menu: lunch })}</span>}
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-ink-3" />
+    </button>
   )
 }
 
@@ -116,13 +189,10 @@ export function HomeScreen({ go }: { go: Go }) {
     <div className="flex flex-col gap-4">
       <AnniversaryStrip />
       <BriefingCard />
-      <WeatherCard />
-      <TodayCard go={go} limit={3} />
-      <RoutineSummaryCard go={go} />
-      <ChoreSummaryCard go={go} />
+      <WeatherCard collapsible />
+      <TodayAllCard go={go} />
       <ShoppingSummaryCard go={go} />
-      <KidsnoteCard />
-      <DinnerCard />
+      <KidsLine go={go} />
     </div>
   )
 }
@@ -143,7 +213,6 @@ export function TabletHome({ go }: { go: Go }) {
           <ChoreSummaryCard go={go} />
         </div>
         <div className="flex flex-col gap-4">
-          <QuickAdd />
           <ShoppingSuggestions />
           <ShoppingList />
           <KidsnoteCard />

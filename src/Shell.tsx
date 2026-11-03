@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, CheckSquare, Home, House, Settings2, ShoppingBasket } from 'lucide-react'
+import { ArrowLeft, Baby, Bell, CheckSquare, Home, House, Settings2, ShoppingBasket } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { togetherDays } from '../shared/anniversaries'
 import { QuickCapture } from './components/QuickCapture'
@@ -9,19 +9,21 @@ import { useHousehold } from './data/store'
 import { formatDay } from './format'
 import { DesktopHome, HomeScreen, TabletHome, type Go } from './screens/Home'
 import { InboxScreen } from './screens/Inbox'
+import { KidsScreen } from './screens/Kids'
 import { OurHomeScreen } from './screens/OurHome'
 import { SettingsScreen } from './screens/Settings'
 import { ShoppingScreen } from './screens/Shopping'
 import { TodosScreen, type TodoSection } from './screens/Todos'
 import { useLayout } from './useLayout'
 
-type Tab = 'home' | 'todos' | 'shopping' | 'ourhome'
+type Tab = 'home' | 'todos' | 'shopping' | 'kids' | 'ourhome'
 type Overlay = 'settings' | 'inbox' | null
 
 const TABS: { id: Tab; icon: typeof Home; label: string }[] = [
   { id: 'home', icon: Home, label: 'tab.home' },
   { id: 'todos', icon: CheckSquare, label: 'tab.todos' },
   { id: 'shopping', icon: ShoppingBasket, label: 'tab.shopping' },
+  { id: 'kids', icon: Baby, label: 'tab.kids' },
   { id: 'ourhome', icon: House, label: 'tab.ourhome' },
 ]
 
@@ -106,6 +108,11 @@ export function Shell() {
 
   useEffect(() => { document.title = t('app.name') }, [])
 
+  // One place to type per screen: the todo and shopping tabs put the quick-add line on top of their list (saving the
+  // line as it is when Claude cannot read it); the other phone tabs keep the round button.
+  const fallback = tab === 'todos' ? 'todo' as const : tab === 'shopping' ? 'shopping' as const : undefined
+  const inlineQuick = !overlay && !!fallback
+
   const go: Go = (next, sec) => {
     setOverlay(null)
     setTab(next)
@@ -144,6 +151,7 @@ export function Shell() {
       tab === 'home' ? (pc ? <DesktopHome go={go} /> : layout === 'tablet' ? <TabletHome go={go} /> : <HomeScreen go={go} />)
       : tab === 'todos' ? <TodosScreen section={section} onSection={setSection} wide={pc} />
       : tab === 'shopping' ? <ShoppingScreen wide={pc} />
+      : tab === 'kids' ? <KidsScreen wide={pc} />
       : <OurHomeScreen openSettings={() => setOverlay('settings')} wide={pc} />
   }
 
@@ -168,7 +176,7 @@ export function Shell() {
           <header className="sticky top-0 z-30 bg-canvas/85 backdrop-blur-xl">
             <div className={`mx-auto flex h-20 items-center gap-6 px-8 ${maxW} box-content`}>
               <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold tracking-tight text-ink">{pcTitle}</h1>
-              {!overlay && <div className="w-[min(480px,45%)] shrink-0"><QuickCapture variant="bar" /></div>}
+              {!overlay && <div className="w-[min(480px,45%)] shrink-0"><QuickCapture variant="bar" fallback={fallback} /></div>}
             </div>
           </header>
           <main className="px-8 pb-12 pt-1">{body}</main>
@@ -183,7 +191,7 @@ export function Shell() {
       <Header
         title={tab === 'home' ? homeTitle : <span className="text-[20px] font-bold tracking-tight">{t(`tab.${tab}`)}</span>}
         right={layout === 'tablet'
-          ? <div className="flex items-center gap-3"><div className="w-[340px]"><QuickCapture variant="bar" /></div>{actions}</div>
+          ? <div className="flex items-center gap-3"><div className="w-[340px]"><QuickCapture variant="bar" fallback={fallback} /></div>{actions}</div>
           : actions}
       />
     )
@@ -214,11 +222,15 @@ export function Shell() {
   return (
     <div className="min-h-full">
       {header}
-      <main className="mx-auto max-w-xl px-5 pb-36"><UpdateBanner />{body}</main>
-      {!overlay && <QuickCapture variant="fab" />}
+      <main className="mx-auto max-w-xl px-5 pb-36">
+        <UpdateBanner />
+        {inlineQuick && <div className="mb-4"><QuickCapture variant="bar" fallback={fallback} /></div>}
+        {body}
+      </main>
+      {!overlay && !inlineQuick && <QuickCapture variant="fab" />}
       {!overlay && (
         <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 backdrop-blur-xl">
-          <div className="mx-auto grid h-16 max-w-xl grid-cols-4">
+          <div className="mx-auto grid h-16 max-w-xl grid-cols-5">
             {TABS.map(({ id, icon: Icon, label }) => (
               <button key={id} type="button" onClick={() => go(id)}
                 className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${tab === id ? 'text-sage' : 'text-ink-3'}`}>

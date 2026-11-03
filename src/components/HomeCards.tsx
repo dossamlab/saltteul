@@ -1,4 +1,4 @@
-import { Cake, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, RefreshCw, Sparkles, Sun, Undo2, UtensilsCrossed } from 'lucide-react'
+import { Cake, ChevronDown, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, RefreshCw, Sparkles, Sun, Undo2, UtensilsCrossed } from 'lucide-react'
 import { useState } from 'react'
 import { togetherDays, upcoming } from '../../shared/anniversaries'
 import { seoulDate, seoulTime } from '../../shared/householdDate'
@@ -60,9 +60,11 @@ function upcomingHours(days: WeatherDay[], today: string, nowHour: number) {
 /**
  * Today and tomorrow by calendar date (not the 4 a.m. household day, so the night shows the right "today"), the hourly
  * forecast, and a refresh that asks the server to fetch again (it reuses a forecast younger than 10 minutes).
+ * collapsible (phone home): one line for today until tapped, then tomorrow and the hourly strip.
  */
-export function WeatherCard({ className = '' }: { className?: string }) {
+export function WeatherCard({ className = '', collapsible = false }: { className?: string; collapsible?: boolean }) {
   const h = useHousehold()
+  const [open, setOpen] = useState(!collapsible)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const now = new Date()
@@ -103,6 +105,22 @@ export function WeatherCard({ className = '' }: { className?: string }) {
         </div>
       )} />
       {days.length === 0 && <Empty>{t('weather.loading')}</Empty>}
+      {!open && days[0] && (() => {
+        const d = days[0]
+        const Icon = d.sky ? SKY_ICON[d.sky] : Cloud
+        return (
+          <button type="button" onClick={() => setOpen(true)} aria-expanded={false} aria-label={t('weather.more')}
+            className="-mt-1 flex w-full items-center gap-2.5 rounded-[var(--radius-field)] bg-muted px-3 py-2.5 text-left">
+            <Icon size={22} className="shrink-0 text-sage" />
+            <span className="shrink-0 text-[15px] font-semibold">{t('weather.range', { min: d.minC ?? '-', max: d.maxC ?? '-' })}</span>
+            <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">
+              {d.rainFrom ? t('weather.rainFrom', { time: d.rainFrom, pop: d.popMax ?? 0 }) : t('weather.pop', { pop: d.popMax ?? 0 })}
+            </span>
+            <ChevronDown size={18} className="shrink-0 text-ink-3" />
+          </button>
+        )
+      })()}
+      {open && (<>
       <div className="grid grid-cols-2 gap-2.5">
         {days.map((d) => {
           const Icon = d.sky ? SKY_ICON[d.sky] : Cloud
@@ -141,9 +159,18 @@ export function WeatherCard({ className = '' }: { className?: string }) {
           })}
         </div>
       )}
-      <p className="mt-2 text-[11px] text-ink-3">
-        {failed ? t('weather.refreshFailed') : w?.updatedAt ? t('weather.updatedAt', { time: seoulTime(new Date(w.updatedAt)) }) : ''}
-      </p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-[11px] text-ink-3">
+          {failed ? t('weather.refreshFailed') : w?.updatedAt ? t('weather.updatedAt', { time: seoulTime(new Date(w.updatedAt)) }) : ''}
+        </p>
+        {collapsible && (
+          <button type="button" onClick={() => setOpen(false)} aria-expanded className="shrink-0 text-[12px] font-semibold text-ink-2">
+            {t('weather.less')}
+          </button>
+        )}
+      </div>
+      </>)}
+      {!open && failed && <p className="mt-2 text-[11px] text-ink-3">{t('weather.refreshFailed')}</p>}
     </Card>
   )
 }
@@ -243,11 +270,11 @@ export function KidsnoteCard({ className = '' }: { className?: string }) {
       {items.map((x) => (
         <div key={x.id} className="py-2">
           <div className="flex items-baseline gap-2">
-            <span className="w-16 shrink-0 text-[12px] font-semibold text-wisteria">{relativeDay(x.date!, h.today)}</span>
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-[12px] font-semibold text-wisteria">{relativeDay(x.date!, h.today)}</span>
             <span className="text-[15px]">{x.title.replace(t('kidsnote.eventPrefix'), '').trim()}</span>
           </div>
           {!!x.prepItems?.length && (
-            <div className="mt-1 flex flex-wrap gap-1 pl-[72px]">
+            <div className="mt-1 flex flex-wrap gap-1 pl-[96px]">
               {x.prepItems.map((p) => (
                 <Pill key={p.name} tone={p.source === 'inferred' ? 'ai' : 'sage'}>
                   {p.name}

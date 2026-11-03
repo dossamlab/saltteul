@@ -159,7 +159,7 @@
 
     { "key": "quick.title", "where": "빠른 입력 창 제목, 휴대폰 둥근 + 버튼 설명", "meaning": "한 줄로 적어 할 일·장보기·한 일을 한꺼번에 넣기", "maxChars": 8 },
     { "key": "quick.placeholder", "where": "빠른 입력 창(휴대폰) 여러 줄 입력칸 예시 글", "meaning": "예: 내일 7시 치과, 우유 2개, 설거지 했음", "maxChars": 30 },
-    { "key": "quick.barPlaceholder", "where": "PC·태블릿 화면 위쪽 한 줄 입력칸 예시 글", "meaning": "한 줄로 적으면 클로드가 나눠 넣는다는 안내와 짧은 예시(예: 내일 7시 치과, 우유 2개)", "maxChars": 30 },
+    { "key": "quick.barPlaceholder", "where": "PC·태블릿 화면 위쪽 한 줄 입력칸 예시 글", "meaning": "한 줄로 적으면 클로드가 나눠 넣는다는 안내와 짧은 예시(예: 내일 7시 치과, 우유 2개)", "maxChars": 30, "fixed": "예: 내일 치과, 우유 2개" },
     { "key": "quick.hint", "where": "빠른 입력칸 아래 작은 글씨", "meaning": "할 일, 살 것, 이미 한 루틴이나 집안일을 섞어 적어도 클로드가 나눠 준다. 넣기 전에 한 번 확인한다", "maxChars": 50 },
     { "key": "quick.submit", "where": "버튼(빠른 입력 보내기)", "meaning": "클로드에게 정리 맡기기", "maxChars": 6 },
     { "key": "quick.fromFile", "where": "버튼", "meaning": "사진이나 PDF로 넣기", "maxChars": 10 },
@@ -442,7 +442,7 @@
     {"key": "widget.pantryExpirySoon", "where": "위젯 유통기한 임박 표시", "meaning": "기한 {days}일", "fixed": "기한 {days}일", "vars": ["days"]},
     {"key": "widget.pantryExpired", "where": "위젯 유통기한 지남 표시", "meaning": "유통기한이 지남", "fixed": "기한 지남"},
     {"key": "dinner.cardTitle", "where": "홈의 식단 카드 제목", "meaning": "오늘 어린이집에서 먹는 식단", "fixed": "오늘 어린이집 식단"},
-    {"key": "dinner.noMenu", "where": "홈 식단 카드(오늘 식단이 없을 때)", "meaning": "오늘 식단이 없다. 우리 집 탭에서 이달 식단표를 올리라", "fixed": "오늘 식단이 없어요. 「우리 집」에서 이달 식단표를 올려 주세요."},
+    {"key": "dinner.noMenu", "where": "홈 식단 카드(오늘 식단이 없을 때)", "meaning": "오늘 식단이 없다. 아이 탭에서 이달 식단표를 올리라", "fixed": "오늘 식단이 없어요. 「아이」 탭에서 이달 식단표를 올려 주세요."},
     {"key": "dinner.suggestToggle", "where": "홈 식단 카드 아래 접힌 저녁 메뉴 추천 버튼", "meaning": "저녁 메뉴 추천 {n}가지 펼치기", "fixed": "저녁 메뉴 추천 {n}가지", "vars": ["n"]},
     {"key": "update.banner", "where": "안드로이드 앱 위쪽 새 버전 안내 띠 제목", "meaning": "새 버전 {version}이 나왔다", "fixed": "새 버전 {version}이 나왔어요", "vars": ["version"]},
     {"key": "update.bannerHint", "where": "새 버전 안내 띠 작은 글씨", "meaning": "받으면 설치 확인이 한 번 뜬다", "fixed": "받으면 설치 확인 창이 한 번 떠요"},
@@ -452,6 +452,24 @@
     {"key": "weather.updatedAt", "where": "날씨 카드 아래 작은 글씨", "meaning": "{time}에 받아온 예보", "fixed": "{time} 기준", "vars": ["time"]},
     {"key": "weather.refreshFailed", "where": "날씨 새로고침 실패 안내", "meaning": "지금은 날씨를 받아오지 못했다. 이전 예보를 보여 준다", "fixed": "지금은 날씨를 받아오지 못했어요. 이전 예보를 보여 드려요."},
     {"key": "weather.hour", "where": "시간별 날씨의 시각", "meaning": "{h}시", "fixed": "{h}시", "vars": ["h"]},
-    {"key": "weather.tomorrowShort", "where": "시간별 날씨에서 내일이 시작되는 자리(0시 대신)", "meaning": "내일", "fixed": "내일"}
+    {"key": "weather.tomorrowShort", "where": "시간별 날씨에서 내일이 시작되는 자리(0시 대신)", "meaning": "내일", "fixed": "내일"},
+    {"key": "tab.kids", "where": "아래 탭", "meaning": "아이 관련(키즈노트·어린이집 식단·성장 기록)이 모인 탭", "fixed": "아이"},
+    {"key": "quick.saveAsTodo", "where": "빠른 입력 오류 뒤 버튼(할 일 탭)", "meaning": "클로드가 못 읽었을 때 적은 그대로 오늘 할 일로 넣기", "fixed": "그대로 할 일에 넣기"},
+    {"key": "quick.saveAsShopping", "where": "빠른 입력 오류 뒤 버튼(장보기 탭)", "meaning": "클로드가 못 읽었을 때 적은 그대로 장보기 목록에 넣기", "fixed": "그대로 장보기에 담기"},
+    {"key": "home.todoProgress", "where": "홈 오늘 카드 오른쪽 위 작은 글씨", "meaning": "오늘 할 일 {total}개 중 {done}개 끝냄", "fixed": "할 일 {done}/{total}", "vars": ["done", "total"]},
+    {"key": "home.routineProgress", "where": "홈 오늘 카드 오른쪽 위 작은 글씨", "meaning": "오늘 루틴 {total}개 중 {done}개 끝냄", "fixed": "루틴 {done}/{total}", "vars": ["done", "total"]},
+    {"key": "home.kidsEvents", "where": "홈 아이 소식 한 줄", "meaning": "다가오는 키즈노트 일정이 {n}건 있다", "fixed": "다가오는 키즈노트 일정 {n}건", "vars": ["n"]},
+    {"key": "home.kidsNoEvents", "where": "홈 아이 소식 한 줄(일정이 없을 때)", "meaning": "다가오는 키즈노트 일정이 없다", "fixed": "다가오는 키즈노트 일정이 없어요"},
+    {"key": "home.kidsLunch", "where": "홈 아이 소식 한 줄 아래 작은 글씨", "meaning": "오늘 어린이집 점심 메뉴", "fixed": "오늘 점심 {menu}", "vars": ["menu"]},
+    {"key": "weather.more", "where": "접힌 날씨 줄의 설명(화면 읽기용)", "meaning": "내일과 시간별 날씨 펼치기", "fixed": "날씨 자세히 보기"},
+    {"key": "weather.less", "where": "펼친 날씨 카드 아래 버튼", "meaning": "날씨를 한 줄로 접기", "fixed": "접기"},
+    {"key": "widget.routineProgress", "where": "태블릿 위젯 루틴 칸 제목(끝난 루틴은 숨기고 진행만 보여 줌)", "meaning": "오늘 루틴 {total}개 중 {done}개 끝냄", "fixed": "오늘 루틴 {done}/{total}", "vars": ["done", "total"]},
+    {"key": "widget.more", "where": "태블릿 위젯 칸 맨 아래(다 못 보여 줄 때)", "meaning": "보이지 않는 항목이 {n}개 더 있다", "fixed": "+{n}개 더", "vars": ["n"]},
+    {"key": "widget.pantryEnough", "where": "태블릿 위젯 상비품 칸 맨 아래", "meaning": "넉넉해서 따로 보여 주지 않는 상비품 {n}개", "fixed": "넉넉한 상비품 {n}개", "vars": ["n"]},
+    {"key": "widget.routineUndo", "where": "태블릿 위젯 루틴 칸의 되돌리기 줄", "meaning": "위젯에서 방금 체크한 루틴 {title}의 체크를 취소한다", "fixed": "↶ {title} 체크 취소", "vars": ["title"]},
+    {"key": "widget.rightEmpty", "where": "태블릿 위젯 오른쪽 칸(장보기·상비품·키즈노트가 모두 비었을 때)", "meaning": "더 챙길 것이 없다", "fixed": "챙길 것이 없어요"},
+    {"key": "home.todayCardTitle", "where": "폰 홈의 오늘 카드 제목(할 일·루틴·집안일을 묶음)", "meaning": "오늘 남은 일", "fixed": "오늘"},
+    {"key": "quick.todoPlaceholder", "where": "할 일 탭 맨 위 한 줄 입력칸 예시 글(폭이 좁아 짧게)", "meaning": "할 일을 한 줄로 적는 예시", "fixed": "예: 내일 7시 치과"},
+    {"key": "quick.shopPlaceholder", "where": "장보기 탭 맨 위 한 줄 입력칸 예시 글(폭이 좁아 짧게)", "meaning": "살 것을 한 줄로 적는 예시", "fixed": "예: 우유 2개, 두부"}
   ]
 }

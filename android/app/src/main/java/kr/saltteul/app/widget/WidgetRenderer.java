@@ -7,9 +7,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
+import android.util.ArrayMap;
+import android.util.SizeF;
 import android.util.Log;
 import android.view.View;
 import android.widget.RemoteViews;
+import java.util.Map;
 import kr.saltteul.app.MainActivity;
 import kr.saltteul.app.R;
 
@@ -19,6 +23,9 @@ public final class WidgetRenderer {
     private static final String TAG = "SaltteulWidget";
 
     static final Class<?>[] PROVIDERS = {DashboardWidget.class, TodoWidget.class, TabletWidget.class};
+
+    /** The tablet board splits into two columns from this width (dp). */
+    static final float TWO_COLUMN_MIN_DP = 400f;
 
     private WidgetRenderer() {}
 
@@ -61,13 +68,38 @@ public final class WidgetRenderer {
     static void render(Context c, AppWidgetManager m, String kind, int[] ids) {
         for (int id : ids) {
             try {
-                m.updateAppWidget(id, build(c, kind, id));
+                m.updateAppWidget(id, views(c, m, kind, id));
             } catch (Throwable e) {
                 Log.w(TAG, "render failed for " + kind, e);
             }
         }
         // notifyAppWidgetViewDataChanged is deprecated on API 35 but is the only way on API 24-34.
         m.notifyAppWidgetViewDataChanged(ids, R.id.widget_list);
+        if (WidgetLogic.KIND_TABLET.equals(kind)) m.notifyAppWidgetViewDataChanged(ids, R.id.widget_list_right);
+    }
+
+    /**
+     * The tablet board as one column when narrow and two when wide. On API 31+ the launcher picks the layout for the
+     * current size itself (so turning the tablet switches it); older versions decide from the size it reports now.
+     */
+    static RemoteViews views(Context c, AppWidgetManager m, String kind, int id) {
+        if (!WidgetLogic.KIND_TABLET.equals(kind)) return build(c, kind, id, false);
+        if (Build.VERSION.SDK_INT >= 31) {
+            Map<SizeF, RemoteViews> bySize = new ArrayMap<>();
+            bySize.put(new SizeF(180f, 180f), build(c, kind, id, false));
+            bySize.put(new SizeF(TWO_COLUMN_MIN_DP, 180f), build(c, kind, id, true));
+            return new RemoteViews(bySize);
+        }
+        return build(c, kind, id, widthDp(c, m, id) >= TWO_COLUMN_MIN_DP);
+    }
+
+    /** Current widget width: the max width in landscape, the min width in portrait (AppWidgetManager options). */
+    private static int widthDp(Context c, AppWidgetManager m, int id) {
+        Bundle o = m.getAppWidgetOptions(id);
+        if (o == null) return 0;
+        boolean landscape = c.getResources().getConfiguration().orientation
+                == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        return o.getInt(landscape ? AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH : AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
     }
 
     private static int layoutFor(String kind) {
@@ -77,7 +109,7 @@ public final class WidgetRenderer {
     }
 
     @SuppressWarnings("deprecation")
-    static RemoteViews build(Context c, String kind, int widgetId) {
+    static RemoteViews build(Context c, String kind, int widgetId, boolean twoColumns) {
         RemoteViews v = new RemoteViews(c.getPackageName(), layoutFor(kind));
         PendingIntent open = openApp(c);
         v.setOnClickPendingIntent(R.id.widget_header, open);
@@ -117,15 +149,28 @@ public final class WidgetRenderer {
             }
         }
 
+        boolean tablet = WidgetLogic.KIND_TABLET.equals(kind);
+        String left = !tablet ? null : twoColumns ? WidgetLogic.COLUMN_LEFT : WidgetLogic.COLUMN_ALL;
+        bindList(c, v, R.id.widget_list, R.id.widget_empty, kind, left, widgetId);
+        if (tablet) {
+            v.setViewVisibility(R.id.widget_col_divider, twoColumns ? View.VISIBLE : View.GONE);
+            v.setViewVisibility(R.id.widget_col_right, twoColumns ? View.VISIBLE : View.GONE);
+            if (twoColumns) bindList(c, v, R.id.widget_list_right, R.id.widget_empty_right, kind, WidgetLogic.COLUMN_RIGHT, widgetId);
+        }
+        return v;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void bindList(Context c, RemoteViews v, int listId, int emptyId, String kind, String column, int widgetId) {
         Intent svc = new Intent(c, WidgetListService.class);
         svc.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         svc.putExtra(WidgetListService.EXTRA_KIND, kind);
-        // Unique data so each widget instance gets its own factory.
+        if (column != null) svc.putExtra(WidgetListService.EXTRA_COLUMN, column);
+        // Unique data so each widget instance (and each column) gets its own factory.
         svc.setData(Uri.parse(svc.toUri(Intent.URI_INTENT_SCHEME)));
-        v.setRemoteAdapter(R.id.widget_list, svc);
-        v.setEmptyView(R.id.widget_list, R.id.widget_empty);
-        v.setPendingIntentTemplate(R.id.widget_list, toggleTemplate(c));
-        return v;
+        v.setRemoteAdapter(listId, svc);
+        v.setEmptyView(listId, emptyId);
+        v.setPendingIntentTemplate(listId, toggleTemplate(c));
     }
 
     private static void showMessage(Context c, RemoteViews v, int textRes) {

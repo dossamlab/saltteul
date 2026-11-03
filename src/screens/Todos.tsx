@@ -1,11 +1,10 @@
-import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { addDays, weekdayOf } from '../../shared/householdDate'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
 import type { Todo, Ymd } from '../../shared/types'
 import { ChoreList, RoutineChecklist } from '../components/RoutineParts'
 import { NudgeSheet, TodoRow, TodoSheet } from '../components/TodoParts'
-import { Button, Card, CardHeader, Empty, Segmented } from '../components/ui'
+import { Card, CardHeader, Empty, Segmented } from '../components/ui'
 import { t } from '../copy'
 import { useHousehold } from '../data/store'
 import { formatDay, weekdayShort } from '../format'
@@ -42,7 +41,7 @@ function WeekStrip({ selected, onSelect }: { selected: Ymd; onSelect: (d: Ymd) =
 export function TodayTodos() {
   const h = useHousehold()
   const [day, setDay] = useState<Ymd>(h.today)
-  const [editing, setEditing] = useState<Todo | 'new' | null>(null)
+  const [editing, setEditing] = useState<Todo | null>(null)
   const [nudge, setNudge] = useState<Todo | null>(null)
   const dated = sortTodos(h.todos.filter((x) => x.date === day))
   const undated = sortTodos(h.todos.filter((x) => !x.date && (!x.done || (x.doneAt ?? 0) > Date.now() - 86_400_000)))
@@ -63,11 +62,7 @@ export function TodayTodos() {
           {undated.map((x) => <TodoRow key={x.id} todo={x} onEdit={setEditing} onNudge={setNudge} />)}
         </div>
       </Card>
-      <Button onClick={() => setEditing('new')}>
-        <Plus size={18} />
-        {t('todo.add')}
-      </Button>
-      <TodoSheet open={editing !== null} onClose={() => setEditing(null)} todo={editing === 'new' ? null : editing} defaultDate={day} />
+      <TodoSheet open={editing !== null} onClose={() => setEditing(null)} todo={editing} defaultDate={day} />
       <NudgeSheet target={nudge && { type: 'todo', id: nudge.id, title: nudge.title }} onClose={() => setNudge(null)} />
     </div>
   )

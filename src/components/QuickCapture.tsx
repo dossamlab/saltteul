@@ -122,9 +122,10 @@ function Toast({ text }: { text: string }) {
 
 /**
  * Quick add: one line of text (or a newsletter photo/PDF) -> Claude proposes items -> the user keeps some -> written.
- * variant 'fab' = phone round button that opens the sheet; 'bar' = inline input for tablet and PC.
+ * variant 'fab' = phone round button that opens the sheet; 'bar' = inline input (tablet and PC header, phone todo and
+ * shopping tabs). fallback: when Claude cannot read the line, offer to save it as it is as a todo or a shopping item.
  */
-export function QuickCapture({ variant }: { variant: 'fab' | 'bar' }) {
+export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fallback?: 'todo' | 'shopping' }) {
   const h = useHousehold()
   const [text, setText] = useState('')
   const [phase, setPhase] = useState<Phase | null>(null)
@@ -189,6 +190,22 @@ export function QuickCapture({ variant }: { variant: 'fab' | 'bar' }) {
       setPhase(null)
       setText('')
       setToast(t('quick.added', { n }))
+    } catch {
+      setPhase({ step: 'error', message: t('quick.saveFailed') })
+    }
+  }
+
+  /** Saves the typed line unparsed, so a todo or shopping item can still go in while Claude is unavailable. */
+  const savePlain = async () => {
+    const value = text.trim()
+    if (!value || !fallback) return
+    try {
+      if (fallback === 'todo') await addTodo(h.hid, { title: value, owner: 'both', date: h.today })
+      else await addShopping(h.hid, h.uid, value)
+      req.current++
+      setPhase(null)
+      setText('')
+      setToast(t('quick.added', { n: 1 }))
     } catch {
       setPhase({ step: 'error', message: t('quick.saveFailed') })
     }
@@ -270,6 +287,12 @@ export function QuickCapture({ variant }: { variant: 'fab' | 'bar' }) {
             <Button variant="soft" className="flex-1" onClick={close}>{t('action.close')}</Button>
             {variant === 'fab' && <Button className="flex-1" onClick={() => setPhase({ step: 'input' })}>{t('quick.retry')}</Button>}
           </div>
+          {fallback && text.trim() && (
+            <Button variant="soft" onClick={savePlain}>
+              <Plus size={18} />
+              {t(fallback === 'todo' ? 'quick.saveAsTodo' : 'quick.saveAsShopping')}
+            </Button>
+          )}
         </div>
       )}
     </Sheet>
@@ -293,7 +316,9 @@ export function QuickCapture({ variant }: { variant: 'fab' | 'bar' }) {
     <>
       <form onSubmit={submitBar} className="flex h-12 w-full items-center gap-1 rounded-full border border-line bg-card pl-4 pr-1.5 shadow-[var(--shadow-card)] focus-within:border-sage">
         <Sparkles size={17} className="shrink-0 text-wisteria" />
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('quick.barPlaceholder')} aria-label={t('quick.title')}
+        <input value={text} onChange={(e) => setText(e.target.value)}
+          placeholder={t(fallback === 'todo' ? 'quick.todoPlaceholder' : fallback === 'shopping' ? 'quick.shopPlaceholder' : 'quick.barPlaceholder')}
+          aria-label={t('quick.title')}
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-[15px] text-ink outline-none placeholder:text-ink-3" />
         <VoiceButton size="sm" onText={appendVoice} onStatus={onVoiceStatus} />
         <IconButton type="button" label={t('quick.fromFile')} onClick={pickFile} className="h-9 w-9"><Camera size={18} /></IconButton>

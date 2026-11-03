@@ -14,23 +14,29 @@ import kr.saltteul.app.R;
 public class WidgetListService extends RemoteViewsService {
 
     public static final String EXTRA_KIND = "kr.saltteul.app.widget.KIND";
+    /** Tablet board column (WidgetLogic.COLUMN_*). */
+    public static final String EXTRA_COLUMN = "kr.saltteul.app.widget.COLUMN";
 
     @Override
     public RemoteViewsFactory onGetViewFactory(Intent intent) {
         String kind = intent.getStringExtra(EXTRA_KIND);
-        return new Factory(getApplicationContext(), kind == null ? WidgetLogic.KIND_DASHBOARD : kind);
+        String column = intent.getStringExtra(EXTRA_COLUMN);
+        return new Factory(getApplicationContext(), kind == null ? WidgetLogic.KIND_DASHBOARD : kind,
+                column == null ? WidgetLogic.COLUMN_ALL : column);
     }
 
     static final class Factory implements RemoteViewsFactory {
         private final Context c;
         private final String kind;
+        private final String column;
         private List<WidgetLogic.Row> rows = new ArrayList<>();
         private Snapshot snap;
         private String day;
 
-        Factory(Context c, String kind) {
+        Factory(Context c, String kind, String column) {
             this.c = c;
             this.kind = kind;
+            this.column = column;
         }
 
         @Override
@@ -39,11 +45,16 @@ public class WidgetListService extends RemoteViewsService {
         @Override
         public void onDataSetChanged() {
             try {
+                long now = System.currentTimeMillis();
                 snap = WidgetRepository.loadCache(c);
-                day = WidgetLogic.householdDate(System.currentTimeMillis());
-                rows = WidgetRepository.currentUid(c) == null
-                        ? new ArrayList<WidgetLogic.Row>()
-                        : WidgetLogic.buildRows(snap, kind, day);
+                day = WidgetLogic.householdDate(now);
+                if (WidgetRepository.currentUid(c) == null) {
+                    rows = new ArrayList<>();
+                } else if (WidgetLogic.KIND_TABLET.equals(kind)) {
+                    rows = WidgetLogic.tabletRows(snap, day, column, WidgetRepository.undoRoutine(c, now));
+                } else {
+                    rows = WidgetLogic.buildRows(snap, kind, day);
+                }
             } catch (Throwable e) {
                 rows = new ArrayList<>();
             }
@@ -65,12 +76,25 @@ public class WidgetListService extends RemoteViewsService {
             WidgetLogic.Row r = rows.get(position);
             if (r.type == WidgetLogic.Row.SECTION) {
                 RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_section);
-                v.setTextViewText(R.id.row_section, c.getString(sectionTitle(r.key)));
+                boolean progress = WidgetLogic.SECTION_ROUTINE.equals(r.key) && r.total > 0;
+                v.setTextViewText(R.id.row_section, progress
+                        ? c.getString(R.string.widget_routineProgress, String.valueOf(r.count), String.valueOf(r.total))
+                        : c.getString(sectionTitle(r.key)));
                 return v;
             }
             if (r.type == WidgetLogic.Row.NOTE) {
                 RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_note);
-                v.setTextViewText(R.id.row_note, c.getString(R.string.widget_allDone));
+                v.setTextViewText(R.id.row_note, noteText(r));
+                return v;
+            }
+            if (r.type == WidgetLogic.Row.UNDO) {
+                RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_undo);
+                v.setTextViewText(R.id.row_undo, c.getString(R.string.widget_routineUndo, r.title == null ? "" : r.title));
+                Intent fill = new Intent();
+                fill.putExtra(ToggleReceiver.EXTRA_TARGET, r.target);
+                fill.putExtra(ToggleReceiver.EXTRA_ID, r.id);
+                fill.putExtra(ToggleReceiver.EXTRA_CHECKED, true);
+                v.setOnClickFillInIntent(R.id.row_undo_area, fill);
                 return v;
             }
             if (WidgetLogic.TARGET_PANTRY.equals(r.target)) return pantryRow(r);
@@ -140,6 +164,14 @@ public class WidgetListService extends RemoteViewsService {
             return b.toString();
         }
 
+        private String noteText(WidgetLogic.Row r) {
+            if (WidgetLogic.NOTE_MORE.equals(r.key)) return c.getString(R.string.widget_more, String.valueOf(r.count));
+            if (WidgetLogic.NOTE_PANTRY_ENOUGH.equals(r.key)) {
+                return c.getString(R.string.widget_pantryEnough, String.valueOf(r.count));
+            }
+            return c.getString(R.string.widget_allDone);
+        }
+
         private static int sectionTitle(String key) {
             if (WidgetLogic.SECTION_ROUTINE.equals(key)) return R.string.widget_routineTitle;
             if (WidgetLogic.SECTION_KIDSNOTE.equals(key)) return R.string.widget_kidsnoteTitle;
@@ -155,8 +187,8 @@ public class WidgetListService extends RemoteViewsService {
 
         @Override
         public int getViewTypeCount() {
-            // section, note, checkbox item, pantry item
-            return 4;
+            // section, note, checkbox item, pantry item, undo
+            return 5;
         }
 
         @Override
