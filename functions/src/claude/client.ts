@@ -53,6 +53,7 @@ export const BRIEFING_SYSTEM = `당신은 부부가 함께 쓰는 집안 살림 
 - 사람을 부를 때는 names에 있는 이름을 그대로 씁니다. owner가 both면 「함께」로 씁니다. 이름이 빈 문자열이면 이름 없이 씁니다.
 - prepItems 가운데 source가 inferred인 것은 「(추천)」을 붙여 추천이라고 밝힙니다. rule·stated는 그냥 씁니다.
 - pantryLow는 집에 늘 두는 물건(상비품) 가운데 떨어져 가는 것(left는 남은 수), pantryExpiring은 유통기한이 days일 남은 것(0 이하면 지남)입니다. 있으면 한 줄로 묶어 씁니다.
+- monthPlans가 있으면(매달 1일과 말일 사흘 전 아침) 이번 달 계획 가운데 아직 못 한 것(left)입니다. 「11월 계획 2개 남음: 겨울옷 정리, 독감 접종」처럼 한 줄로 씁니다(이름은 3개까지).
 - dinnerIdeas는 오늘 저녁 메뉴 추천(어린이집 식단과 겹치지 않게 고른 것)입니다. 있으면 마지막 줄에 「저녁 추천: 메뉴, 메뉴, 메뉴」 꼴로 이름만 씁니다.
 - 입력에 없는 일정, 숫자, 날짜, 장소, 사람을 지어내지 않습니다. 날씨는 weather 값이 있을 때만 말합니다.
 - 할 말이 거의 없으면 lines를 1~2줄로 짧게 둡니다.`
@@ -88,6 +89,7 @@ export const QUICK_ADD_SYSTEM = `당신은 부부가 함께 쓰는 살림 앱 �
 항목 종류(kind):
 - todo: 할 일이나 일정. title은 짧게(예: 「소아과 예약」). 날짜가 있으면 date(YYYY-MM-DD, today와 weekday로 계산), 시각이 있으면 time(24시간제 HH:mm).
   날짜나 시각이 없으면 null. 「저녁에」처럼 시각이 막연하면 time은 null로 두고 note에 그 표현을 적습니다. 챙길 물건이 함께 적혀 있으면 prepItems에 넣습니다.
+  「이번 달 안에」「이달 중」「다음 달에」처럼 날짜 없이 달만 정한 일은 date를 null로 두고 month에 그 달(YYYY-MM)을 씁니다. 날짜가 있거나 달을 말하지 않으면 month는 null.
 - shopping: 살 물건. title은 물건 이름만, 수량이 적혀 있으면 qty(예: 「2개」). openShopping에 이미 있는 물건은 넣지 않습니다.
 - routineDone: 오늘 루틴을 했다는 말(예: 「영양제 먹었어」). routines에서 맞는 것의 id를 refId에, 그 이름을 title에 씁니다. doneToday가 true인 루틴은 넣지 않습니다.
 - choreDone: 집안일을 했다는 말(예: 「화장실 청소 끝」). chores에서 맞는 것의 id를 refId에, 그 이름을 title에 씁니다.

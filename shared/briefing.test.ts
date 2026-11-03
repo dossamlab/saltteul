@@ -99,6 +99,28 @@ describe('pantry in briefings', () => {
   })
 })
 
+describe('month plans in briefings', () => {
+  const plans: HouseholdSnapshot = {
+    ...snap,
+    todos: [
+      ...snap.todos,
+      { id: 'p1', title: '겨울옷 정리', month: '2026-10', owner: 'both', done: false, source: 'manual', updatedAt: 0 },
+      { id: 'p2', title: '독감 접종', month: '2026-09', owner: 'wife', done: false, source: 'manual', updatedAt: 0 },
+      { id: 'p3', title: '타이어 점검', month: '2026-10', owner: 'husband', done: true, source: 'manual', updatedAt: 0 },
+    ],
+  }
+  it('lists open plans, carried ones first, on the morning three days before the month ends', () => {
+    const i = buildBriefingInput(plans, new Date('2026-10-27T22:30:00Z'), 'morning') // KST 10-28, October has 31 days
+    expect(i.monthPlans).toEqual({ month: 10, left: ['독감 접종', '겨울옷 정리'] })
+    expect(i.undatedOpenCount).toBe(1) // plans are not undated todos
+    expect(fallbackBriefing(i, makeT({ 'brief.fb.monthPlans': '{m}:{n}:{titles}' })).lines).toContain('10:2:독감 접종, 겨울옷 정리')
+  })
+  it('stays quiet on other days and in the evening', () => {
+    expect(buildBriefingInput(plans, new Date('2026-10-26T22:30:00Z'), 'morning').monthPlans).toBeNull()
+    expect(buildBriefingInput(plans, new Date('2026-10-28T11:00:00Z'), 'evening').monthPlans).toBeNull()
+  })
+})
+
 describe('fallbackBriefing', () => {
   it('builds lines from copy keys', () => {
     const t = makeT({})

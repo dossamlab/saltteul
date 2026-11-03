@@ -4,6 +4,7 @@ import type { BriefTodo, HouseholdSnapshot } from '../../../shared/briefingInput
 import { choreNextDue } from '../../../shared/chores'
 import { dueSoon } from '../../../shared/consumables'
 import { addDays, diffDays, householdDate, weekdayOf } from '../../../shared/householdDate'
+import { isMonthPlan } from '../../../shared/monthPlan'
 import type { Briefing, Todo } from '../../../shared/types'
 import type { T } from '../copy'
 import { HID } from '../household'
@@ -69,7 +70,7 @@ export function buildWeeklyInput(s: HouseholdSnapshot, now: Date): WeeklyInput {
     chores,
     anniversaries: upcoming(s.anniversaries, today, s.anniversaries.length).filter((a) => a.daysLeft >= 1 && a.daysLeft <= WEEK_DAYS),
     consumablesDue: dueSoon(s.consumables, today, WEEK_DAYS).map((c) => ({ name: c.name, daysLeft: c.daysLeft })),
-    undatedOpenCount: open.filter((t) => !t.date).length,
+    undatedOpenCount: open.filter((t) => !t.date && !isMonthPlan(t)).length,
   }
 }
 

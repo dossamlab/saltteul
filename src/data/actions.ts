@@ -18,11 +18,13 @@ function clean<T extends object>(o: T): T {
 }
 
 // Todos
-export type TodoDraft = Pick<Todo, 'title' | 'owner'> & Partial<Pick<Todo, 'note' | 'date' | 'time' | 'prepItems'>>
+export type TodoDraft = Pick<Todo, 'title' | 'owner'> & Partial<Pick<Todo, 'note' | 'date' | 'time' | 'prepItems' | 'month'>>
 
 export function addTodo(hid: string, d: TodoDraft) {
   return addDoc(col(hid, 'todos'), clean({
     title: d.title.trim(), owner: d.owner, note: d.note?.trim() || undefined, date: d.date || null, time: d.time || null,
+    // A month plan only while there is no date.
+    month: !d.date && d.month ? d.month : undefined,
     prepItems: d.prepItems?.length ? d.prepItems : undefined,
     done: false, source: 'manual', updatedAt: now(), syncOrigin: 'app',
   }))
@@ -35,6 +37,10 @@ export function toggleTodo(hid: string, todo: Todo, uid: string) {
   return updateTodo(hid, todo.id, { done, doneBy: done ? uid : null, doneAt: done ? now() : null })
 }
 export const deleteTodo = (hid: string, id: string) => deleteDoc(ref(hid, 'todos', id))
+
+/** The shared memo of a month plan (one document per month). */
+export const saveMonthNote = (hid: string, uid: string, month: string, text: string) =>
+  setDoc(ref(hid, 'monthNotes', month), { text: text.trim(), updatedAt: now(), updatedBy: uid })
 
 // Shopping
 export function addShopping(hid: string, uid: string, name: string, extra: Partial<ShoppingItem> = {}) {

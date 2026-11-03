@@ -19,6 +19,8 @@ export interface Todo {
   note?: string
   date?: Ymd | null
   time?: string | null // 'HH:mm'
+  /** Month plan ('YYYY-MM') while there is no date; cleared when a date is set. */
+  month?: string | null
   owner: Owner
   done: boolean
   doneBy?: string | null
@@ -207,7 +209,7 @@ export interface KidsnoteClass {
  * the app shows a confirmation list and writes the items the user keeps.
  */
 export type QuickItem =
-  | { kind: 'todo'; title: string; date: Ymd | null; time: string | null; owner: Owner; note?: string | null; prepItems?: PrepItem[] }
+  | { kind: 'todo'; title: string; date: Ymd | null; time: string | null; owner: Owner; note?: string | null; prepItems?: PrepItem[]; month?: string | null }
   | { kind: 'shopping'; name: string; qty: string | null; note: string | null }
   | { kind: 'routineDone'; routineId: string; title: string }
   | { kind: 'choreDone'; choreId: string; title: string }
@@ -283,4 +285,11 @@ export interface IntegrationState {
   /** kidsnote only: the daycare's classes and the child's class on record, refreshed by each poll. */
   classes?: KidsnoteClass[]
   detectedClassId?: string | null
+}
+
+/** households/{hid}/monthNotes/{YYYY-MM}: the shared memo of a month in the month plan. */
+export interface MonthNote {
+  text: string
+  updatedAt: number
+  updatedBy: string
 }

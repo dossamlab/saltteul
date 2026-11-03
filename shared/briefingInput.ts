@@ -2,6 +2,7 @@ import { remindersForToday, togetherDays, type UpcomingAnniversary } from './ann
 import { choreStatus, sortChores, type ChoreStatus } from './chores'
 import { dueSoon } from './consumables'
 import { addDays, householdDate } from './householdDate'
+import { isMonthPlan, isPlanReminderDay, monthNumber, monthOf, openPlansNow } from './monthPlan'
 import { daysToExpiry, expiresSoon, isLow, qtyLabel, sortPantry } from './pantry'
 import { isRoutineDone, routinesForDay } from './routines'
 import type {
@@ -53,6 +54,8 @@ export interface BriefingInput {
   /** morning only: today's dinner ideas, dish names. */
   dinnerIdeas: string[]
   shoppingLeft: string[]
+  /** morning only, on the 1st and three days before the month ends: open month plans (optional for older inputs). */
+  monthPlans?: { month: number; left: string[] } | null
 }
 
 function brief(t: Todo): BriefTodo {
@@ -83,7 +86,7 @@ export function buildBriefingInput(s: HouseholdSnapshot, now: Date, slot: 'morni
     weather: s.settings.weather?.days.find((d) => d.day === focusDay) ?? null,
     focusTodos: open.filter((t) => t.date === focusDay).map(brief).sort(byTime),
     todayLeft: slot === 'evening' ? open.filter((t) => t.date === day).map(brief).sort(byTime) : [],
-    undatedOpenCount: open.filter((t) => !t.date).length,
+    undatedOpenCount: open.filter((t) => !t.date && !isMonthPlan(t)).length,
     routinesLeft:
       slot === 'evening'
         ? routinesForDay(s.routines, day)
@@ -106,7 +109,13 @@ export function buildBriefingInput(s: HouseholdSnapshot, now: Date, slot: 'morni
         : [],
     dinnerIdeas: slot === 'morning' && s.dinner?.day === day ? (s.dinner.options ?? []).map((o) => o.name).filter(Boolean) : [],
     shoppingLeft: s.shopping.filter((i) => !i.bought).map((i) => i.name),
+    monthPlans: slot === 'morning' && isPlanReminderDay(day) ? monthPlansLeft(s.todos, day) : null,
   }
+}
+
+function monthPlansLeft(todos: Todo[], day: Ymd): { month: number; left: string[] } | null {
+  const left = openPlansNow(todos, day).map((t) => t.title)
+  return left.length ? { month: monthNumber(monthOf(day)), left } : null
 }
 
 /** True when there is nothing worth saying. */
@@ -114,6 +123,6 @@ export function isEmptyBriefing(i: BriefingInput): boolean {
   return (
     i.focusTodos.length === 0 && i.todayLeft.length === 0 && i.routinesLeft.length === 0 &&
     i.chores.length === 0 && i.anniversaries.length === 0 && i.consumablesDue.length === 0 &&
-    i.pantryLow.length === 0 && i.pantryExpiring.length === 0 && i.dinnerIdeas.length === 0 && !i.weather
+    i.pantryLow.length === 0 && i.pantryExpiring.length === 0 && i.dinnerIdeas.length === 0 && !i.monthPlans && !i.weather
   )
 }

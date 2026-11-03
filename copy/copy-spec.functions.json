@@ -56,5 +56,6 @@
 
   {"key": "kidsnote.requestTodoTitle", "where": "알림장에서 선생님이 보내 달라고 한 물건으로 만든 할 일 제목. {items}는 물건 이름을 쉼표로 이은 것", "meaning": "어린이집에 {items}를 보내기", "fixed": "어린이집에 {items} 보내기", "vars": ["items"]},
   {"key": "kidsnote.requestPantryNote", "where": "보낼 물건 할 일의 메모(그 물건이 상비품일 때). 여럿이면 · 로 이음", "meaning": "집에 {name}이 {qty} 있다", "fixed": "집에 {name} {qty} 있어요", "vars": ["name", "qty"]},
+  {"key": "brief.fb.monthPlans", "where": "기본 아침 브리핑 한 줄(매달 1일과 말일 사흘 전, 이번 달 계획이 남았을 때). {titles}는 계획 이름 3개까지 쉼표로 이은 것", "meaning": "{m}월 계획이 {n}개 남았다: {titles}", "fixed": "{m}월 계획 {n}개 남았어요: {titles}", "vars": ["m", "n", "titles"]},
   {"key": "kidsnote.requestShoppingNote", "where": "어린이집이 보내 달라고 한 상비품이 부족해 장보기에 넣을 때 붙는 메모", "meaning": "어린이집에서 보내 달라고 했다", "fixed": "어린이집 요청"}
 ]

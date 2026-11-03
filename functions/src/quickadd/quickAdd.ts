@@ -2,6 +2,7 @@
 // Nothing is written here; the app shows the proposal and saves what the user keeps.
 import type { Firestore } from 'firebase-admin/firestore'
 import { diffDays, householdDate, isValidYmd, seoulTime, weekdayOf } from '../../../shared/householdDate'
+import { diffMonths, isYm, monthOf } from '../../../shared/monthPlan'
 import { routinesForDay } from '../../../shared/routines'
 import { applyPantryOp } from '../../../shared/pantry'
 import type { Chore, Owner, PantryItem, PrepItem, QuickAddResult, QuickItem, Routine, RoutineLog, ShoppingItem, Ymd } from '../../../shared/types'
@@ -68,7 +69,10 @@ export function finalizeQuickAdd(raw: RawQuickAdd, ctx: QuickContext): Pick<Quic
         const title = cut(it.title, 100)
         if (!title) break
         const date = quickDate(it.date, ctx.today)
-        if (!once(`todo|${norm(title)}|${date ?? ''}`)) break
+        // A month plan: no date, this month up to a year ahead.
+        const ahead = isYm(it.month) ? diffMonths(monthOf(ctx.today), it.month) : -1
+        const month = !date && ahead >= 0 && ahead <= 12 ? it.month : null
+        if (!once(`todo|${norm(title)}|${date ?? month ?? ''}`)) break
         const prepSeen = new Set<string>()
         const prepItems: PrepItem[] = it.prepItems
           .filter((p) => !prepSeen.has(norm(p)) && !!prepSeen.add(norm(p)))
@@ -81,6 +85,7 @@ export function finalizeQuickAdd(raw: RawQuickAdd, ctx: QuickContext): Pick<Quic
           owner: OWNERS.includes(it.owner as Owner) ? (it.owner as Owner) : 'both',
           note: cut(it.note, 200),
           ...(prepItems.length ? { prepItems } : {}),
+          ...(month ? { month } : {}),
         })
         break
       }

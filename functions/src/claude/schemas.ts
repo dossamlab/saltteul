@@ -198,6 +198,8 @@ export interface RawQuickItem {
   prepItems: string[]
   /** pantry kinds: how many, in the item's unit; null when not said (use → 1, add → the usual purchase amount) */
   amount: number | null
+  /** todo without a date meant for a month ('YYYY-MM', e.g. "이번 달 안에"); null otherwise */
+  month: string | null
 }
 
 export interface RawQuickAdd {
@@ -223,8 +225,9 @@ export const quickAddSchema = {
           refId: nullableString,
           prepItems: { type: 'array', items: { type: 'string' } },
           amount: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+          month: nullableString,
         },
-        required: ['kind', 'title', 'date', 'time', 'owner', 'note', 'qty', 'refId', 'prepItems', 'amount'],
+        required: ['kind', 'title', 'date', 'time', 'owner', 'note', 'qty', 'refId', 'prepItems', 'amount', 'month'],
         additionalProperties: false,
       },
     },
@@ -252,6 +255,7 @@ export function validateQuickAddRaw(v: unknown): RawQuickAdd {
       refId: s(it.refId),
       prepItems: Array.isArray(it.prepItems) ? it.prepItems.map(s).filter((x): x is string => !!x) : [],
       amount: typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount >= 0 ? it.amount : null,
+      month: s(it.month),
     })
   }
   const unparsed = arr(v.unparsed ?? [], 'unparsed')

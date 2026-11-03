@@ -149,7 +149,7 @@ export function Shell() {
   else {
     body =
       tab === 'home' ? (pc ? <DesktopHome go={go} /> : layout === 'tablet' ? <TabletHome go={go} /> : <HomeScreen go={go} />)
-      : tab === 'todos' ? <TodosScreen section={section} onSection={setSection} wide={pc} />
+      : tab === 'todos' ? <TodosScreen section={section} onSection={setSection} wide={pc} detailed={layout !== 'phone'} />
       : tab === 'shopping' ? <ShoppingScreen wide={pc} />
       : tab === 'kids' ? <KidsScreen wide={pc} />
       : <OurHomeScreen openSettings={() => setOverlay('settings')} wide={pc} />

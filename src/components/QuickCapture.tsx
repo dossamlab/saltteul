@@ -38,7 +38,7 @@ async function applyItems(h: HouseholdData, items: QuickItem[]): Promise<number>
     switch (it.kind) {
       case 'todo':
         await addTodo(h.hid, {
-          title: it.title, owner: it.owner, date: it.date, time: it.time, note: it.note ?? undefined, prepItems: it.prepItems,
+          title: it.title, owner: it.owner, date: it.date, time: it.time, note: it.note ?? undefined, prepItems: it.prepItems, month: it.month,
         })
         return 1
       case 'shopping':
@@ -87,7 +87,7 @@ function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolea
           <Pill tone={item.kind === 'shopping' ? 'terra' : item.kind === 'todo' ? 'muted' : item.kind === 'pantry' || item.kind === 'pantryNew' ? 'ai' : 'sage'}>{t(KIND_KEY[item.kind])}</Pill>
           {item.kind === 'todo' && (
             <>
-              <span>{item.date ? relativeDay(item.date, h.today) : t('quick.noDate')}</span>
+              <span>{item.date ? relativeDay(item.date, h.today) : item.month ? t('quick.monthPlan', { m: Number(item.month.slice(5)) }) : t('quick.noDate')}</span>
               {item.time && <span>{timeLabel(item.time)}</span>}
               <OwnerBadge owner={item.owner} name={h.nameOf(item.owner)} />
             </>

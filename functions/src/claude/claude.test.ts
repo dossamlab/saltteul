@@ -114,7 +114,7 @@ describe('AnthropicClaude', () => {
     const c = new AnthropicClaude({ messages: sdk.messages })
     const out = await c.quickAdd({ text: 'x' } as never)
     expect(out).toEqual({
-      items: [{ kind: 'todo', title: 'Dentist', date: '2026-10-29', time: '15:00', owner: 'wife', note: null, qty: null, refId: null, prepItems: ['card'], amount: null }],
+      items: [{ kind: 'todo', title: 'Dentist', date: '2026-10-29', time: '15:00', owner: 'wife', note: null, qty: null, refId: null, prepItems: ['card'], amount: null, month: null }],
       unparsed: ['hmm'],
       model: 'claude-sonnet-5-5',
     })

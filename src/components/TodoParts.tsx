@@ -1,4 +1,4 @@
-import { BellRing, CalendarCheck2, School, Sparkles, Trash2 } from 'lucide-react'
+import { BellRing, CalendarCheck2, Plus, School, Sparkles, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import type { Owner, Todo } from '../../shared/types'
 import { t } from '../copy'
@@ -7,7 +7,21 @@ import { useHousehold } from '../data/store'
 import { timeLabel } from '../format'
 import { Button, Checkbox, Field, IconButton, OwnerBadge, OwnerPicker, Pill, Sheet } from './ui'
 
-export function TodoRow({ todo, onEdit, onNudge }: { todo: Todo; onEdit: (t: Todo) => void; onNudge?: (t: Todo) => void }) {
+export function sortTodos(list: Todo[]) {
+  return [...list].sort((a, b) => Number(a.done) - Number(b.done) || (a.time ?? '99').localeCompare(b.time ?? '99'))
+}
+
+/** Dashed "+ add" button at the bottom of a list card. */
+export function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="mt-2 flex h-10 w-full items-center justify-center gap-1.5 rounded-[var(--radius-field)] border-[1.5px] border-dashed border-line text-[13px] font-semibold text-ink-2">
+      <Plus size={16} />{label}
+    </button>
+  )
+}
+
+export function TodoRow({ todo, onEdit, onNudge, tag }: { todo: Todo; onEdit: (t: Todo) => void; onNudge?: (t: Todo) => void; tag?: string }) {
   const h = useHousehold()
   return (
     <div className="flex items-start gap-3 py-2.5">
@@ -18,6 +32,7 @@ export function TodoRow({ todo, onEdit, onNudge }: { todo: Todo; onEdit: (t: Tod
         <p className={`text-[15px] leading-snug ${todo.done ? 'done-text' : 'text-ink'}`}>{todo.title}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2">
           {todo.time && <span>{timeLabel(todo.time)}</span>}
+          {tag && <Pill tone="terra">{tag}</Pill>}
           <OwnerBadge owner={todo.owner} name={h.nameOf(todo.owner)} />
           {todo.source === 'kidsnote' && (
             <Pill tone="ai">
@@ -54,25 +69,29 @@ export function TodoRow({ todo, onEdit, onNudge }: { todo: Todo; onEdit: (t: Tod
   )
 }
 
-export function TodoSheet({ open, onClose, todo, defaultDate }: { open: boolean; onClose: () => void; todo?: Todo | null; defaultDate?: string | null }) {
+/** Add or edit a todo. With `month` (and no date) a new todo is a month plan; setting a date makes it a normal todo. */
+export function TodoSheet({ open, onClose, todo, defaultDate, month }: {
+  open: boolean; onClose: () => void; todo?: Todo | null; defaultDate?: string | null; month?: string | null
+}) {
   const h = useHousehold()
-  const [draft, setDraft] = useState<TodoDraft>(() => fromTodo(todo, defaultDate, h.me?.role ?? 'both'))
-  const [key, setKey] = useState(todo?.id ?? 'new')
-  if ((todo?.id ?? 'new') !== key) {
-    setKey(todo?.id ?? 'new')
-    setDraft(fromTodo(todo, defaultDate, h.me?.role ?? 'both'))
+  const [draft, setDraft] = useState<TodoDraft>(() => fromTodo(todo, defaultDate, h.me?.role ?? 'both', month))
+  const [key, setKey] = useState(`${todo?.id ?? 'new'}|${month ?? ''}`)
+  if (`${todo?.id ?? 'new'}|${month ?? ''}` !== key) {
+    setKey(`${todo?.id ?? 'new'}|${month ?? ''}`)
+    setDraft(fromTodo(todo, defaultDate, h.me?.role ?? 'both', month))
   }
+  const plan = !draft.date && !!draft.month
   const names = { husband: h.nameOf('husband'), wife: h.nameOf('wife'), both: h.nameOf('both') }
 
   const save = async () => {
     if (!draft.title.trim()) return
-    if (todo) await updateTodo(h.hid, todo.id, { ...draft, date: draft.date || null, time: draft.time || null })
+    if (todo) await updateTodo(h.hid, todo.id, { ...draft, date: draft.date || null, time: draft.time || null, month: draft.date ? null : draft.month ?? null })
     else await addTodo(h.hid, draft)
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={todo ? t('todo.editTitle') : t('todo.addTitle')}>
+    <Sheet open={open} onClose={onClose} title={plan ? t(todo ? 'plan.editTitle' : 'plan.addTitle', { m: Number(draft.month!.slice(5)) }) : todo ? t('todo.editTitle') : t('todo.addTitle')}>
       <div className="flex flex-col gap-4">
         <Field label={t('field.title')} value={draft.title} autoFocus placeholder={t('todo.titlePlaceholder')}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
@@ -82,7 +101,7 @@ export function TodoSheet({ open, onClose, todo, defaultDate }: { open: boolean;
         </div>
         <OwnerPicker value={draft.owner} onChange={(owner) => setDraft({ ...draft, owner })} names={names} />
         <Field label={t('field.note')} value={draft.note ?? ''} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
-        {draft.date ? <p className="text-[12px] text-ink-2">{t('todo.calendarHint')}</p> : null}
+        {draft.date ? <p className="text-[12px] text-ink-2">{t('todo.calendarHint')}</p> : plan ? <p className="text-[12px] text-ink-2">{t('plan.dateHint')}</p> : null}
         <div className="flex gap-2">
           {todo && (
             <Button variant="soft" onClick={async () => { await deleteTodo(h.hid, todo.id); onClose() }} aria-label={t('action.delete')}>
@@ -96,12 +115,13 @@ export function TodoSheet({ open, onClose, todo, defaultDate }: { open: boolean;
   )
 }
 
-function fromTodo(todo: Todo | null | undefined, defaultDate: string | null | undefined, myRole: Owner): TodoDraft {
+function fromTodo(todo: Todo | null | undefined, defaultDate: string | null | undefined, myRole: Owner, month?: string | null): TodoDraft {
   return {
+    month: todo ? todo.month ?? null : month ?? null,
     title: todo?.title ?? '',
     owner: todo?.owner ?? myRole,
     note: todo?.note ?? '',
-    date: todo ? todo.date ?? null : defaultDate ?? null,
+    date: todo ? todo.date ?? null : month ? null : defaultDate ?? null,
     time: todo?.time ?? null,
   }
 }

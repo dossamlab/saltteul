@@ -1,6 +1,7 @@
-import { Baby, ChevronRight, ShoppingBasket } from 'lucide-react'
+import { Baby, CalendarRange, ChevronRight, ShoppingBasket } from 'lucide-react'
 import { useState } from 'react'
 import { choreStatus } from '../../shared/chores'
+import { monthNumber, monthOf, openPlansNow } from '../../shared/monthPlan'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
 import type { Todo } from '../../shared/types'
 import { AnniversaryCard, AnniversaryStrip, BriefingCard, DinnerCard, KidsnoteCard, WeatherCard } from '../components/HomeCards'
@@ -11,7 +12,7 @@ import { t } from '../copy'
 import { toggleShopping } from '../data/actions'
 import { useHousehold } from '../data/store'
 import { ShoppingList, ShoppingSuggestions } from './Shopping'
-import { sortTodos, type TodoSection } from './Todos'
+import { sortTodos, writeTodoView, type TodoSection } from './Todos'
 
 export type Go = (tab: 'home' | 'todos' | 'shopping' | 'kids' | 'ourhome', section?: TodoSection) => void
 
@@ -20,6 +21,21 @@ function MoreLink({ onClick }: { onClick: () => void }) {
     <button type="button" onClick={onClick} className="flex items-center text-[13px] font-semibold text-sage">
       {t('action.seeAll')}
       <ChevronRight size={16} />
+    </button>
+  )
+}
+
+/** One line under today's todos while this month's plans are open; opens the todo tab in the month view. */
+function MonthPlanLine({ go }: { go: Go }) {
+  const h = useHousehold()
+  const left = openPlansNow(h.todos, h.today).length
+  if (!left) return null
+  return (
+    <button type="button" onClick={() => { writeTodoView('month'); go('todos', 'today') }}
+      className="mt-3 flex w-full items-center gap-2.5 rounded-[var(--radius-field)] bg-muted px-3.5 py-2.5 text-left text-[14px] text-ink">
+      <CalendarRange size={16} className="shrink-0 text-sage" />
+      <span className="min-w-0 flex-1">{t('home.monthPlansLeft', { m: monthNumber(monthOf(h.today)), n: left })}</span>
+      <ChevronRight size={16} className="shrink-0 text-ink-3" />
     </button>
   )
 }
@@ -39,6 +55,7 @@ function TodayCard({ go, limit, className }: { go: Go; limit?: number; className
       <div className="divide-y divide-line">
         {shown.map((x) => <TodoRow key={x.id} todo={x} onEdit={setEditing} onNudge={setNudge} />)}
       </div>
+      <MonthPlanLine go={go} />
       <TodoSheet open={!!editing} onClose={() => setEditing(null)} todo={editing} />
       <NudgeSheet target={nudge && { type: 'todo', id: nudge.id, title: nudge.title }} onClose={() => setNudge(null)} />
     </Card>
@@ -160,6 +177,7 @@ function TodayAllCard({ go }: { go: Go }) {
           <ChoreList compact />
         </>
       )}
+      <MonthPlanLine go={go} />
       <TodoSheet open={!!editing} onClose={() => setEditing(null)} todo={editing} />
       <NudgeSheet target={nudge && { type: 'todo', id: nudge.id, title: nudge.title }} onClose={() => setNudge(null)} />
     </Card>

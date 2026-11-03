@@ -17,7 +17,7 @@ const ALREADY_DEADLINE = '참가비 납부 마감'
 const t = makeT({ 'kidsnote.deadlineTitle': 'Due: {title}' })
 
 const item = (p: Partial<RawQuickItem>): RawQuickItem => ({
-  kind: 'todo', title: 'x', date: null, time: null, owner: null, note: null, qty: null, refId: null, prepItems: [], amount: null, ...p,
+  kind: 'todo', title: 'x', date: null, time: null, owner: null, note: null, qty: null, refId: null, prepItems: [], amount: null, month: null, ...p,
 })
 
 function seed() {
@@ -106,6 +106,28 @@ describe('finalizeQuickAdd', () => {
       { kind: 'choreDone', choreId: 'c1', title: 'Bathroom' },
     ])
     expect(out.unparsed).toEqual(['what is this'])
+  })
+
+  it('keeps a month plan for this month up to a year ahead, only without a date', () => {
+    const out = finalizeQuickAdd({
+      items: [
+        item({ title: 'Flu shot', month: '2026-10' }),
+        item({ title: 'Winter clothes', month: '2026-11', owner: 'wife' }),
+        item({ title: 'Dated', date: '2026-10-30', month: '2026-10' }),
+        item({ title: 'Last month', month: '2026-09' }),
+        item({ title: 'Too far', month: '2027-11' }),
+        item({ title: 'Bad', month: '2026-13' }),
+      ],
+      unparsed: [],
+    }, ctx)
+    expect(out.items.map((x) => (x.kind === 'todo' ? [x.title, x.date, x.month ?? null] : null))).toEqual([
+      ['Flu shot', null, '2026-10'],
+      ['Winter clothes', null, '2026-11'],
+      ['Dated', '2026-10-30', null],
+      ['Last month', null, null],
+      ['Too far', null, null],
+      ['Bad', null, null],
+    ])
   })
 
   it('returns at most 20 items', () => {

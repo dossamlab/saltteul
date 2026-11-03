@@ -52,6 +52,11 @@ await Promise.all([
   add('todos', { title: '[키즈노트] 가을 소풍', date: hd(5), owner: 'both', done: false, source: 'kidsnote', kidsnoteBatchId: 'batch-ex', updatedAt: now,
     prepItems: [{ name: '도시락', source: 'stated' }, { name: '돗자리', source: 'inferred' }] }),
   add('todos', { title: '전구 사기', owner: 'husband', done: false, source: 'manual', updatedAt: now }),
+  // Month plans (no date, a month) and one carried over from last month.
+  add('todos', { title: '겨울옷 정리', month: today.slice(0, 7), owner: 'both', done: false, source: 'manual', updatedAt: now }),
+  add('todos', { title: '독감 예방접종', month: today.slice(0, 7), owner: 'husband', done: false, source: 'manual', updatedAt: now }),
+  add('todos', { title: '보일러 필터 청소', month: today.slice(0, 7), owner: 'husband', done: true, doneBy: 'husband-uid', doneAt: now, source: 'manual', updatedAt: now }),
+  add('todos', { title: '가족사진 인화', month: hd(-Number(today.slice(8))).slice(0, 7), owner: 'wife', done: false, source: 'manual', updatedAt: now }),
   add('shopping', { name: '국산 두부', qty: '1모', note: '된장찌개용', addedBy: 'wife-uid', bought: false, source: 'manual', createdAt: now - 3000 }),
   add('shopping', { name: '우유 1L', qty: '2개', addedBy: 'husband-uid', bought: false, source: 'manual', createdAt: now - 2000 }),
   add('shopping', { name: '애호박', addedBy: 'wife-uid', bought: false, source: 'manual', createdAt: now - 1000 }),
@@ -102,4 +107,6 @@ await H.collection('dinner').doc(today).set({
     { name: '달걀 애호박 볶음밥', why: '15분이면 되는 간단한 메뉴예요.', ingredients: ['달걀', '애호박', '우유 1L'] },
   ],
 })
+await H.collection('monthNotes').doc(today.slice(0, 7)).set({ text: '겨울 준비하는 달. 김장 전에 냉장고 비우기.', updatedAt: now, updatedBy: 'wife-uid' })
+
 console.log('seeded household "home" for', today, '- login: husband@example.com / wife@example.com, password', PASSWORD)
