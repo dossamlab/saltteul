@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
 import ko from '../../copy/ko.json' with { type: 'json' }
 
-const T = ko as Record<string, string>
+// Same merge as src/copy.ts: household-only wording wins when copy/ko.private.json exists.
+const PRIVATE = new URL('../../copy/ko.private.json', import.meta.url)
+const T: Record<string, string> = { ...ko, ...(existsSync(PRIVATE) ? JSON.parse(readFileSync(PRIVATE, 'utf8')) : {}) }
 
 async function login(page: Page, email = 'husband@example.com') {
   await page.goto('/')

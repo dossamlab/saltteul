@@ -10,5 +10,7 @@ git -C "$ROOT" archive HEAD | tar -x -C "$OUT"
 mkdir -p "$OUT/.vercel"
 cp "$ROOT/.vercel/project.json" "$OUT/.vercel/"
 cp "$ROOT/.env.production" "$OUT/"
+# Household-only wording (not in the public repository), if this copy of the project has it.
+[ -f "$ROOT/copy/ko.private.json" ] && cp "$ROOT/copy/ko.private.json" "$OUT/copy/"
 cd "$OUT"
 vercel deploy --prod --yes --no-color
