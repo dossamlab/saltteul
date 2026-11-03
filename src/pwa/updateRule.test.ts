@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareVersions, isManifest, shouldDownload } from './updateRule'
+import { buildTime, compareVersions, isManifest, shouldDownload } from './updateRule'
 
 const M = { version: '20261029120000', url: '20261029120000.zip', checksum: 'a'.repeat(64), minNative: '0.3.0' }
 
@@ -24,5 +24,11 @@ describe('live update rule', () => {
     expect(shouldDownload(M, { buildId: '20261029120000', native: '0.3.0' })).toBe(false)
     expect(shouldDownload(M, { buildId: '20261030000000', native: '0.3.0' })).toBe(false)
     expect(shouldDownload({ ...M, minNative: '0.4.0' }, { buildId: '20261028090000', native: '0.3.0' })).toBe(false)
+  })
+
+  it('shows a build id in Seoul time', () => {
+    expect(buildTime('20261103002923')).toEqual({ m: 11, d: 3, time: '09:29' })
+    expect(buildTime('20261231160000')).toEqual({ m: 1, d: 1, time: '01:00' })
+    expect(buildTime('dev')).toBeNull()
   })
 })

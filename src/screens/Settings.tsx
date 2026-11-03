@@ -2,6 +2,7 @@ import { Bell, CalendarDays, Check, CloudSun, LogOut, RefreshCw, School, Sparkle
 import { useState, type ReactNode } from 'react'
 import type { IntegrationState } from '../../shared/types'
 import { logOut } from '../auth/session'
+import { AppVersionCard } from '../components/AppVersionCard'
 import { KidsnoteHistoryButton } from '../components/KidsnoteHistory'
 import { LocationCard } from '../components/LocationCard'
 import { Button, Card, CardHeader, Field, Pill } from '../components/ui'
@@ -190,6 +191,8 @@ export function SettingsScreen({ wide = false }: { wide?: boolean }) {
           {refresh.msg && <p className="mt-2 text-[13px] text-ink-2">{refresh.msg}</p>}
           {usingEmulators && <p className="mt-2 text-[12px] text-terra-2">{t('settings.emulatorNotice')}</p>}
         </Card>
+
+        <AppVersionCard />
 
         <Button variant="ghost" onClick={() => logOut()}><LogOut size={18} />{t('settings.signOut')}</Button>
       </div>

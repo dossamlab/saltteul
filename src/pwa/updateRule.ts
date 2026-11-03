@@ -33,6 +33,15 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
+/** A build id (UTC yyyyMMddHHmmss) as the Seoul month, day and HH:MM it was built, or null when it is not one. */
+export function buildTime(id: string): { m: number; d: number; time: string } | null {
+  if (!BUILD_ID.test(id)) return null
+  const n = (a: number, b: number) => Number(id.slice(a, b))
+  const seoul = new Date(Date.UTC(n(0, 4), n(4, 6) - 1, n(6, 8), n(8, 10), n(10, 12)) + 9 * 60 * 60 * 1000)
+  const pad = (v: number) => String(v).padStart(2, '0')
+  return { m: seoul.getUTCMonth() + 1, d: seoul.getUTCDate(), time: `${pad(seoul.getUTCHours())}:${pad(seoul.getUTCMinutes())}` }
+}
+
 /** Download when the manifest is a newer build than the running screens and the installed app is new enough for it. */
 export function shouldDownload(m: UpdateManifest, running: { buildId: string; native: string }): boolean {
   return m.version > running.buildId && compareVersions(running.native, m.minNative) >= 0

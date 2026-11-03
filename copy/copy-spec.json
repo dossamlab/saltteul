@@ -470,6 +470,18 @@
     {"key": "widget.rightEmpty", "where": "태블릿 위젯 오른쪽 칸(장보기·상비품·키즈노트가 모두 비었을 때)", "meaning": "더 챙길 것이 없다", "fixed": "챙길 것이 없어요"},
     {"key": "home.todayCardTitle", "where": "폰 홈의 오늘 카드 제목(할 일·루틴·집안일을 묶음)", "meaning": "오늘 남은 일", "fixed": "오늘"},
     {"key": "quick.todoPlaceholder", "where": "할 일 탭 맨 위 한 줄 입력칸 예시 글(폭이 좁아 짧게)", "meaning": "할 일을 한 줄로 적는 예시", "fixed": "예: 내일 7시 치과"},
-    {"key": "quick.shopPlaceholder", "where": "장보기 탭 맨 위 한 줄 입력칸 예시 글(폭이 좁아 짧게)", "meaning": "살 것을 한 줄로 적는 예시", "fixed": "예: 우유 2개, 두부"}
+    {"key": "quick.shopPlaceholder", "where": "장보기 탭 맨 위 한 줄 입력칸 예시 글(폭이 좁아 짧게)", "meaning": "살 것을 한 줄로 적는 예시", "fixed": "예: 우유 2개, 두부"},
+    {"key": "version.title", "where": "설정 화면 카드 제목", "meaning": "설치된 앱과 화면의 버전, 업데이트 확인", "fixed": "앱 버전"},
+    {"key": "version.app", "where": "설정 앱 버전 카드의 지금 버전(안드로이드 앱 본체)", "meaning": "설치된 앱 본체 버전 {version}", "fixed": "앱 {version}", "vars": ["version"]},
+    {"key": "version.screens", "where": "설정 앱 버전 카드의 지금 버전(화면 묶음이 만들어진 때)", "meaning": "지금 화면은 {m}월 {d}일 {time}에 만든 판", "fixed": "화면 {m}월 {d}일 {time}판", "vars": ["m", "d", "time"]},
+    {"key": "version.webHint", "where": "설정 앱 버전 카드(아이폰 웹앱·PC)", "meaning": "웹에서는 열 때마다 최신 화면을 받는다", "fixed": "웹에서는 열 때마다 최신 화면을 받아요"},
+    {"key": "version.check", "where": "설정 앱 버전 카드 버튼", "meaning": "새 화면과 새 앱이 있는지 지금 확인하기", "fixed": "업데이트 확인"},
+    {"key": "version.checking", "where": "설정 앱 버전 카드 버튼(확인하는 중)", "meaning": "확인하는 중", "fixed": "확인하는 중…"},
+    {"key": "version.reload", "where": "설정 앱 버전 카드 버튼(웹)", "meaning": "페이지를 다시 불러오기", "fixed": "새로고침"},
+    {"key": "version.latest", "where": "업데이트 확인 결과(새것이 없을 때)", "meaning": "지금이 최신 버전이다", "fixed": "최신 버전이에요"},
+    {"key": "version.screensReady", "where": "업데이트 확인 결과(새 화면을 받았을 때)", "meaning": "새 화면을 받아 두었다", "fixed": "새 화면을 받아 두었어요"},
+    {"key": "version.applyHint", "where": "새 화면 적용 버튼 옆 작은 글씨", "meaning": "적용하면 앱이 잠깐 다시 열린다", "fixed": "적용하면 앱이 잠깐 다시 열려요"},
+    {"key": "version.applyNow", "where": "새 화면 적용 버튼", "meaning": "새 화면으로 지금 바꾸기", "fixed": "지금 적용"},
+    {"key": "version.failed", "where": "업데이트 확인 실패 안내", "meaning": "확인하지 못했다. 인터넷 연결을 확인해 달라", "fixed": "확인하지 못했어요. 인터넷 연결을 확인해 주세요."}
   ]
 }
