@@ -29,9 +29,18 @@ export interface ExtractedDeadline {
   isoDate: string | null
 }
 
+/** Something the teacher asks the family to send in (diapers, a new toothbrush), with or without a date. */
+export interface ExtractedRequest {
+  name: string
+  dateText: string
+  isoDate: string | null
+}
+
 export interface KidsnoteExtraction {
   events: ExtractedEvent[]
   deadlines: ExtractedDeadline[]
+  /** Optional so records and fakes from before requests existed still fit. */
+  requests?: ExtractedRequest[]
   notes: string[]
 }
 
@@ -87,9 +96,18 @@ export const extractionSchema = {
         additionalProperties: false,
       },
     },
+    requests: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, dateText: { type: 'string' }, isoDate: nullableString },
+        required: ['name', 'dateText', 'isoDate'],
+        additionalProperties: false,
+      },
+    },
     notes: { type: 'array', items: { type: 'string' } },
   },
-  required: ['events', 'deadlines', 'notes'],
+  required: ['events', 'deadlines', 'requests', 'notes'],
   additionalProperties: false,
 } as const
 
@@ -150,8 +168,13 @@ export function validateExtraction(v: unknown): KidsnoteExtraction {
     const iso = optStr(d.isoDate, 'isoDate')
     return { title: str(d.title, 'title'), dateText: str(d.dateText ?? '', 'dateText'), isoDate: iso && ISO_DATE.test(iso) ? iso : null }
   }).filter((d) => d.title)
+  const requests = arr(v.requests ?? [], 'requests').map((r, i): ExtractedRequest => {
+    if (!isObj(r)) throw new InvalidOutputError(`requests[${i}] is not an object`)
+    const iso = optStr(r.isoDate, 'isoDate')
+    return { name: str(r.name, 'name'), dateText: str(r.dateText ?? '', 'dateText'), isoDate: iso && ISO_DATE.test(iso) ? iso : null }
+  }).filter((r) => r.name)
   const notes = arr(v.notes ?? [], 'notes').map((n, i) => str(n, `notes[${i}]`)).filter(Boolean)
-  return { events, deadlines, notes }
+  return { events, deadlines, requests, notes }
 }
 
 // ── Quick add ───────────────────────────────────────────────────────────────

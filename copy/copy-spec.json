@@ -482,6 +482,7 @@
     {"key": "version.screensReady", "where": "업데이트 확인 결과(새 화면을 받았을 때)", "meaning": "새 화면을 받아 두었다", "fixed": "새 화면을 받아 두었어요"},
     {"key": "version.applyHint", "where": "새 화면 적용 버튼 옆 작은 글씨", "meaning": "적용하면 앱이 잠깐 다시 열린다", "fixed": "적용하면 앱이 잠깐 다시 열려요"},
     {"key": "version.applyNow", "where": "새 화면 적용 버튼", "meaning": "새 화면으로 지금 바꾸기", "fixed": "지금 적용"},
-    {"key": "version.failed", "where": "업데이트 확인 실패 안내", "meaning": "확인하지 못했다. 인터넷 연결을 확인해 달라", "fixed": "확인하지 못했어요. 인터넷 연결을 확인해 주세요."}
+    {"key": "version.failed", "where": "업데이트 확인 실패 안내", "meaning": "확인하지 못했다. 인터넷 연결을 확인해 달라", "fixed": "확인하지 못했어요. 인터넷 연결을 확인해 주세요."},
+    {"key": "kidsnote.history.requests", "where": "처리 기록 자세히 보기 소제목", "meaning": "선생님이 집에서 보내 달라고 한 물건", "fixed": "보내 달라는 물건"}
   ]
 }

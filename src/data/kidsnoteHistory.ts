@@ -18,6 +18,7 @@ export interface KidsnoteRecord {
   extraction?: {
     events?: { title: string; dateText?: string; isoDate?: string | null; time?: string | null }[]
     deadlines?: { title: string; dateText?: string; isoDate?: string | null }[]
+    requests?: { name: string; dateText?: string; isoDate?: string | null }[]
     notes?: string[]
   }
 }

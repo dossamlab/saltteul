@@ -4,7 +4,7 @@ import { FakeClaude } from '../claude/client'
 import type { KidsnoteExtraction } from '../claude/schemas'
 import { FakeFirestore } from '../testing/fakeFirestore'
 import { FakeMessaging } from '../testing/fakeMessaging'
-import { mergePrepItems, planKidsnote, resolveEventDate } from './apply'
+import { mergePrepItems, nextSchoolDay, planKidsnote, resolveEventDate } from './apply'
 import { FakeKidsnote, HttpKidsnote, KidsnoteAuthError, parseReport, type KidsnoteTokens } from './client'
 import { connectKidsnote, KIDSNOTE_SECRET_PATH } from './connect'
 import { pollKidsnote } from './poll'
@@ -23,6 +23,9 @@ const t = makeT({
   'kidsnote.dateCheckTitle': 'Check date: {title} ({dateText})',
   'kidsnote.prepTodoTitle': 'Pack for {title}: {items}',
   'kidsnote.deadlineTitle': 'Due: {title}',
+  'kidsnote.requestTodoTitle': 'Send {items}',
+  'kidsnote.requestPantryNote': '{name}: {qty} at home',
+  'kidsnote.requestShoppingNote': 'asked by daycare',
   'push.kidsnote.title': 'Kids Note',
   'push.kidsnote.body': '{events} events, {items} items',
   'push.kidsnote.bodyWithCheck': '{events} events, {items} items, {checks} to check',
@@ -126,6 +129,50 @@ describe('planKidsnote', () => {
       written: W, today: W, rules: [], existingTodoKeys: new Set(), openShoppingNames: [], batchId: 'b', now: 1, t,
     })
     expect(late.todos[1]).toMatchObject({ date: W, time: null })
+  })
+
+  it('turns items to send in into one todo for the next daycare day, and lists a low pantry item', () => {
+    const pantry = [
+      { id: 'p1', name: 'Diapers', aliases: ['diaper'], qty: 1, minQty: 1, unit: ' packs' },
+      { id: 'p2', name: 'Wipes', qty: 5, minQty: 1, unit: ' packs' },
+    ]
+    const p = planKidsnote({
+      extraction: {
+        events: [], deadlines: [], notes: [],
+        requests: [
+          { name: 'diaper', dateText: '', isoDate: null },
+          { name: 'Wipes', dateText: '', isoDate: null },
+          { name: 'Toothbrush', dateText: '', isoDate: null },
+        ],
+      },
+      written: W, today: W, rules: [], existingTodoKeys: new Set(), openShoppingNames: [], pantry, batchId: 'b', now: 1, t,
+    })
+    expect(p.todos).toEqual([expect.objectContaining({
+      title: 'Send diaper, Wipes, Toothbrush', date: '2026-10-29', time: null, kidsnoteBatchId: 'b',
+      note: 'Diapers: 1 packs at home · Wipes: 5 packs at home',
+      prepItems: [{ name: 'diaper', source: 'stated' }, { name: 'Wipes', source: 'stated' }, { name: 'Toothbrush', source: 'stated' }],
+    })])
+    // Only the low pantry item goes on the list, linked so buying it restocks the pantry.
+    expect(p.shopping).toEqual([expect.objectContaining({ name: 'Diapers', pantryId: 'p1', note: 'asked by daycare', kidsnoteBatchId: 'b' })])
+    expect(p.counts).toMatchObject({ prepItems: 3, shopping: 1, events: 0 })
+
+    const again = planKidsnote({
+      extraction: { events: [], deadlines: [], notes: [], requests: [{ name: 'diaper', dateText: TOMORROW, isoDate: null }] },
+      written: W, today: W, rules: [], existingTodoKeys: new Set(), openShoppingNames: ['diaper'], pantry, batchId: 'b', now: 1, t,
+    })
+    expect(again.todos[0]).toMatchObject({ title: 'Send diaper', date: '2026-10-29' })
+    expect(again.shopping).toEqual([])
+  })
+
+  it('moves a Friday request to Monday and a late one to today', () => {
+    expect(nextSchoolDay('2026-10-30')).toBe('2026-11-02')
+    expect(nextSchoolDay('2026-10-31')).toBe('2026-11-02')
+    expect(nextSchoolDay(W)).toBe('2026-10-29')
+    const late = planKidsnote({
+      extraction: { events: [], deadlines: [], notes: [], requests: [{ name: 'Lotion', dateText: '', isoDate: null }] },
+      written: '2026-10-26', today: W, rules: [], existingTodoKeys: new Set(), openShoppingNames: [], batchId: 'b', now: 1, t,
+    })
+    expect(late.todos[0]).toMatchObject({ date: W, note: '' })
   })
 })
 

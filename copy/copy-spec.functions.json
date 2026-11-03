@@ -52,5 +52,9 @@
   {"key": "push.pantryLow.bodyNoName", "where": "상비품 부족 푸시 본문(누가 썼는지 모를 때)", "meaning": "{qty} 남았다", "fixed": "{qty} 남았어요. 장보기에 담아 둘까요?", "vars": ["qty"]},
   {"key": "brief.fb.pantryLow", "where": "기본 브리핑 한 줄(상비품 부족)", "meaning": "{name} {qty} 남음", "fixed": "{name} {qty} 남았어요", "vars": ["name", "qty"]},
   {"key": "brief.fb.pantryExpiry", "where": "기본 브리핑 한 줄(유통기한 임박)", "meaning": "{name} 유통기한 {days}일 남음", "fixed": "{name} 유통기한이 {days}일 남았어요", "vars": ["name", "days"]},
-  {"key": "brief.fb.dinner", "where": "기본 아침 브리핑 마지막 줄(오늘 저녁 메뉴 추천)", "meaning": "저녁 추천 메뉴 이름들", "fixed": "저녁 추천: {names}", "vars": ["names"]}
+  {"key": "brief.fb.dinner", "where": "기본 아침 브리핑 마지막 줄(오늘 저녁 메뉴 추천)", "meaning": "저녁 추천 메뉴 이름들", "fixed": "저녁 추천: {names}", "vars": ["names"]},
+
+  {"key": "kidsnote.requestTodoTitle", "where": "알림장에서 선생님이 보내 달라고 한 물건으로 만든 할 일 제목. {items}는 물건 이름을 쉼표로 이은 것", "meaning": "어린이집에 {items}를 보내기", "fixed": "어린이집에 {items} 보내기", "vars": ["items"]},
+  {"key": "kidsnote.requestPantryNote", "where": "보낼 물건 할 일의 메모(그 물건이 상비품일 때). 여럿이면 · 로 이음", "meaning": "집에 {name}이 {qty} 있다", "fixed": "집에 {name} {qty} 있어요", "vars": ["name", "qty"]},
+  {"key": "kidsnote.requestShoppingNote", "where": "어린이집이 보내 달라고 한 상비품이 부족해 장보기에 넣을 때 붙는 메모", "meaning": "어린이집에서 보내 달라고 했다", "fixed": "어린이집 요청"}
 ]

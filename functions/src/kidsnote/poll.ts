@@ -1,6 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore'
 import { householdDate } from '../../../shared/householdDate'
-import type { IntegrationState, KidsnoteClass, PrepRule, Settings, ShoppingItem } from '../../../shared/types'
+import type { IntegrationState, KidsnoteClass, PantryItem, PrepRule, Settings, ShoppingItem } from '../../../shared/types'
 import type { TodoDoc } from '../calendar/mapping'
 import type { ClaudePort } from '../claude/client'
 import type { KidsnoteExtraction } from '../claude/schemas'
@@ -184,11 +184,13 @@ export async function pollKidsnote(deps: PollDeps, now: Date = new Date()): Prom
   const audience = needsAudience ? await noticeAudience(deps, secret, tokens) : null
   if (!items.length) return finish({ status: 'ok', processed: 0, batches: [] }, { reports: false, notices: false })
 
-  const [rulesSnap, todosSnap, shoppingSnap] = await Promise.all([
+  const [rulesSnap, todosSnap, shoppingSnap, pantrySnap] = await Promise.all([
     db.collection(`${h}/prepRules`).get(),
     db.collection(`${h}/todos`).where('source', '==', 'kidsnote').get(),
     db.collection(`${h}/shopping`).where('bought', '==', false).get(),
+    db.collection(`${h}/pantry`).get(),
   ])
+  const pantry = pantrySnap.docs.map((d) => ({ ...(d.data() as PantryItem), id: d.id }))
   const rules = rulesSnap.docs.map((d) => ({ ...(d.data() as PrepRule), id: d.id }))
   const existingTodoKeys = new Set(todosSnap.docs.map((d) => d.data() as TodoDoc).map((td) => todoKey(td.title, td.date)))
   const openShoppingNames = shoppingSnap.docs.map((d) => (d.data() as ShoppingItem).name)
@@ -224,7 +226,7 @@ export async function pollKidsnote(deps: PollDeps, now: Date = new Date()): Prom
           text: report.text, written: report.written, ruleKeywords, ...(attachments.length ? { attachments } : {}),
           ...(kind === 'notice' && audience?.prompt ? { audience: audience.prompt } : {}),
         })
-        : { events: [], deadlines: [], notes: [], model: null }
+        : { events: [], deadlines: [], requests: [], notes: [], model: null }
       if (readable) await recordIntegration(db, 'claude', true, undefined, now.getTime())
     } catch (e) {
       deps.log?.('kidsnote: extraction failed, will retry next run', e instanceof Error ? e.message : e)
@@ -235,7 +237,7 @@ export async function pollKidsnote(deps: PollDeps, now: Date = new Date()): Prom
     }
 
     const plan = planKidsnote({
-      extraction, written: report.written, today, rules, existingTodoKeys, openShoppingNames, batchId, now: now.getTime(), t,
+      extraction, written: report.written, today, rules, existingTodoKeys, openShoppingNames, pantry, batchId, now: now.getTime(), t,
     })
     for (const td of plan.todos) existingTodoKeys.add(todoKey(td.title, td.date))
     for (const s of plan.shopping) openShoppingNames.push(s.name)
@@ -251,7 +253,7 @@ export async function pollKidsnote(deps: PollDeps, now: Date = new Date()): Prom
       // Kept for the weekly growth journal (reports only; the journal skips notices).
       text: report.text,
       attachmentCount: attachments.length,
-      extraction: { events: extraction.events, deadlines: extraction.deadlines, notes: extraction.notes },
+      extraction: { events: extraction.events, deadlines: extraction.deadlines, requests: extraction.requests ?? [], notes: extraction.notes },
       model: extraction.model,
       batchId,
       counts: plan.counts,

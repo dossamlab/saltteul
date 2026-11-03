@@ -167,8 +167,11 @@ describe('AnthropicClaude', () => {
         { title: ' ', kind: 'event', dateText: '', isoDate: null, time: null, prepItems: [] },
       ],
       deadlines: [{ title: 'Form', dateText: '', isoDate: '2026-11-01' }],
+      requests: [{ name: ' Diapers ', dateText: '', isoDate: 'soon' }, { name: '', dateText: '', isoDate: null }],
       notes: ['n'],
     })
+    expect(v.requests).toEqual([{ name: 'Diapers', dateText: '', isoDate: null }])
+    expect(validateExtraction({ events: [], deadlines: [], notes: [] }).requests).toEqual([])
     expect(v.events).toEqual([
       { title: 'Trip', kind: 'other', dateText: 'next Wed', isoDate: null, time: null, prepItems: [{ name: 'Hat', source: 'inferred', needsPurchase: false }] },
     ])

@@ -27,6 +27,7 @@ function RecordRow({ r, open, onToggle }: { r: KidsnoteRecord; open: boolean; on
   const [undo, setUndo] = useState<'idle' | 'busy' | 'error'>('idle')
   const status = recordStatus(r)
   const found = foundItems(r)
+  const requests = (r.extraction?.requests ?? []).filter((q) => q.name)
   const notes = r.extraction?.notes ?? []
   const runUndo = async () => {
     if (!r.batchId) return
@@ -64,13 +65,19 @@ function RecordRow({ r, open, onToggle }: { r: KidsnoteRecord; open: boolean; on
               ))}
             </div>
           )}
+          {requests.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-ink-2">{t('kidsnote.history.requests')}</p>
+              <p className="leading-relaxed text-ink">{requests.map((q) => q.name).join(', ')}</p>
+            </div>
+          )}
           {notes.length > 0 && (
             <div>
               <p className="mb-1 font-semibold text-ink-2">{t('kidsnote.history.notes')}</p>
               {notes.map((n, i) => <p key={i} className="leading-relaxed text-ink">{n}</p>)}
             </div>
           )}
-          {!found.length && !notes.length && <p className="text-ink-2">{t('kidsnote.history.nothingFound')}</p>}
+          {!found.length && !requests.length && !notes.length && <p className="text-ink-2">{t('kidsnote.history.nothingFound')}</p>}
           <div className="mt-1 flex flex-wrap gap-2">
             {r.url && (
               <a href={r.url} target="_blank" rel="noreferrer"

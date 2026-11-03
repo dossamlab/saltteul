@@ -1,8 +1,9 @@
 import type { Firestore } from 'firebase-admin/firestore'
-import { addDays, diffDays, isValidYmd } from '../../../shared/householdDate'
+import { addDays, diffDays, isValidYmd, weekdayOf } from '../../../shared/householdDate'
+import { findPantryItem, isLow, qtyLabel } from '../../../shared/pantry'
 import { applyPrepRules } from '../../../shared/prepRules'
 import { resolveRelativeDate } from '../../../shared/relativeDate'
-import type { PrepItem, PrepRule, ShoppingItem, Ymd } from '../../../shared/types'
+import type { PantryItem, PrepItem, PrepRule, ShoppingItem, Ymd } from '../../../shared/types'
 import type { TodoDoc } from '../calendar/mapping'
 import type { ExtractedPrepItem, KidsnoteExtraction } from '../claude/schemas'
 import type { T } from '../copy'
@@ -47,6 +48,13 @@ export function mergePrepItems(ruleItems: string[], extracted: ExtractedPrepItem
   return out
 }
 
+/** The next day the child is at daycare after `from`; a weekend moves to Monday (public holidays are not known). */
+export function nextSchoolDay(from: Ymd): Ymd {
+  let d = addDays(from, 1)
+  while (weekdayOf(d) === 0 || weekdayOf(d) === 6) d = addDays(d, 1)
+  return d
+}
+
 export type NewTodo = Omit<TodoDoc, 'id'>
 export type NewShopping = Omit<ShoppingItem, 'id'>
 
@@ -66,6 +74,8 @@ export interface PlanInput {
   existingTodoKeys: Set<string>
   /** Names of shopping items not yet bought. */
   openShoppingNames: string[]
+  /** Household pantry, so a requested item can show the count at home and go on the list when it is low. */
+  pantry?: Pick<PantryItem, 'id' | 'name' | 'aliases' | 'qty' | 'minQty' | 'unit'>[]
   batchId: string
   now: number
   t: T
@@ -213,6 +223,49 @@ export function planKidsnote(p: PlanInput): KidsnotePlan {
     keys.add(todoKey(title, date))
     todos.push(base(title, date, null, []))
     counts.deadlines++
+  }
+
+  // Items the teacher asked to send in: one todo per day (the asked day, else the next daycare day). A pantry item that
+  // is low also goes on the shopping list; anything else is probably at home already, so only the todo is made.
+  const byDate = new Map<Ymd, string[]>()
+  for (const r of p.extraction.requests ?? []) {
+    const asked = resolveEventDate(r.dateText, r.isoDate, p.written) ?? nextSchoolDay(p.written)
+    const date = isPast(asked) ? p.today : asked
+    const names = byDate.get(date) ?? []
+    if (!names.some((n) => norm(n) === norm(r.name))) names.push(r.name.trim())
+    byDate.set(date, names)
+  }
+  for (const [date, names] of byDate) {
+    const title = t('kidsnote.requestTodoTitle', { items: names.join(', ') })
+    if (keys.has(todoKey(title, date))) continue
+    keys.add(todoKey(title, date))
+    const atHome = names.map((n) => findPantryItem(p.pantry ?? [], n)).filter((x) => !!x)
+    const note = atHome.map((x) => t('kidsnote.requestPantryNote', { name: x.name, qty: qtyLabel(x) })).join(' · ')
+    todos.push(base(title, date, null, names.map((name) => ({ name, source: 'stated' as const })), note))
+    for (const n of names) {
+      if (prepSeen.has(norm(n))) continue
+      prepSeen.add(norm(n))
+      counts.prepItems++
+    }
+    for (const x of atHome) {
+      if (!isLow(x) || [x.name, ...(x.aliases ?? [])].some((n) => shoppingSeen.has(norm(n)))) continue
+      shoppingSeen.add(norm(x.name))
+      shopping.push({
+        name: x.name,
+        qty: '',
+        note: t('kidsnote.requestShoppingNote'),
+        addedBy: 'kidsnote',
+        bought: false,
+        boughtBy: null,
+        boughtAt: null,
+        source: 'kidsnote',
+        consumableId: null,
+        pantryId: x.id,
+        kidsnoteBatchId: batchId,
+        createdAt: now,
+      })
+      counts.shopping++
+    }
   }
 
   return { todos, shopping, counts }
