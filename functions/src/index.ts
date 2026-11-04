@@ -32,6 +32,7 @@ import { runExtractMenu } from './menu/menu'
 import { runExtractFromFile } from './quickadd/fromFile'
 import { QuickInputError, runQuickAdd } from './quickadd/quickAdd'
 import { GoogleSpeech, runTranscribe, SpeechInputError } from './speech/transcribe'
+import { loadSpeechVocabulary } from './speech/vocabulary'
 import { householdDate } from '../../shared/householdDate'
 import { KmaWeather } from './weather/kma'
 import { OpenMeteoWeather } from './weather/openMeteo'
@@ -199,12 +200,23 @@ export const extractMenu = onCall(
 )
 
 let speechClient: GoogleSpeech | null = null
+/** Household words change rarely; a warm instance reuses them for a few minutes so recording is not slowed by reads. */
+const VOCAB_TTL_MS = 5 * 60_000
+let vocabCache: { at: number; words: Promise<string[]> } | null = null
+const speechVocabulary = () => {
+  if (!vocabCache || Date.now() - vocabCache.at > VOCAB_TTL_MS) {
+    const words = loadSpeechVocabulary(db())
+    vocabCache = { at: Date.now(), words }
+    words.catch(() => { if (vocabCache?.words === words) vocabCache = null })
+  }
+  return vocabCache.words
+}
 
 /** transcribe({ audioBase64, sampleRate }) → { text }. 16-bit mono PCM, at most 30 seconds. */
 export const transcribe = onCall({ region: REGION, timeoutSeconds: 60 }, async (req) => {
   await memberOrThrow(req.auth?.uid)
   try {
-    return await runTranscribe((speechClient ??= new GoogleSpeech()), req.data)
+    return await runTranscribe((speechClient ??= new GoogleSpeech(log)), req.data, speechVocabulary, log)
   } catch (e) {
     if (e instanceof SpeechInputError) throw new HttpsError('invalid-argument', e.message)
     logger.error('speech failed', e instanceof Error ? e.message : e)
