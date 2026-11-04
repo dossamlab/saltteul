@@ -1,11 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { BriefingInput } from '../../../shared/briefingInput'
 import type { Ymd } from '../../../shared/types'
-import type { Attachment, DinnerInput, JournalInput, MenuInput, QuickAddInput, WeeklyInput } from './inputs'
+import type { Attachment, DinnerInput, JournalInput, MenuInput, QuickAddInput, SpeechFixInput, WeeklyInput } from './inputs'
 import {
-  briefingSchema, dinnerSchema, extractionSchema, InvalidOutputError, journalSchema, menuSchema, quickAddSchema,
-  validateBriefing, validateDinner, validateExtraction, validateJournal, validateMenu, validateQuickAddRaw,
+  briefingSchema, dinnerSchema, extractionSchema, InvalidOutputError, journalSchema, menuSchema, quickAddSchema, speechFixSchema,
+  validateBriefing, validateDinner, validateExtraction, validateJournal, validateMenu, validateQuickAddRaw, validateSpeechFix,
   type BriefingResult, type DinnerResult, type JournalResult, type KidsnoteExtraction, type MenuExtraction, type RawQuickAdd,
+  type SpeechFixResult,
 } from './schemas'
 
 /** Briefings, weekly preview, growth journal, notice and photo extraction. */
@@ -37,6 +38,7 @@ export interface ClaudePort {
   writeJournal(input: JournalInput): Promise<WithModel<JournalResult>>
   suggestDinner(input: DinnerInput): Promise<WithModel<DinnerResult>>
   extractMenu(input: MenuInput): Promise<WithModel<MenuExtraction>>
+  fixTranscript(input: SpeechFixInput): Promise<WithModel<SpeechFixResult>>
 }
 
 export class ClaudeRefusalError extends Error {}
@@ -160,6 +162,22 @@ export const MENU_SYSTEM = `당신은 어린이집 월간 식단표(사진 또�
   - morningSnack: 오전 간식 목록. afternoonSnack: 오후 간식 목록. 간식이 한 칸뿐이면 시간 표시를 보고 나누고, 알 수 없으면 afternoonSnack에 넣습니다.
 - 음식 이름은 표에 적힌 그대로 씁니다. 알레르기 번호, 원산지, 열량 같은 숫자와 기호는 뺍니다.
 - 읽을 수 없는 칸은 빈 배열로 둡니다. 표에 없는 음식이나 날짜를 지어내지 않습니다.`
+
+export const SPEECH_FIX_SYSTEM = `당신은 살림 앱 「살뜰」의 음성 입력을 바로잡는 도우미입니다.
+사용자가 휴대폰에 짧게 말한 것을 구글 음성 인식이 글자로 바꿨습니다. 소리는 받지 않고 글자만 받습니다.
+입력 JSON: 음성 인식이 낸 후보 문장(candidates, 첫 번째가 가장 유력), 이 집에서 자주 쓰는 낱말(words: 상비품, 루틴, 집안일, 장보기, 가족 이름).
+말한 내용은 대개 할 일, 일정, 장볼 것, 했다는 보고(루틴, 집안일), 상비품을 썼다·샀다·남았다는 말입니다.
+
+할 일: 사용자가 실제로 한 말일 가능성이 가장 큰 문장 하나를 text에 씁니다.
+- 후보 가운데 뜻이 통하는 것을 고릅니다. 모두 비슷하면 첫 번째 후보를 씁니다.
+- 고른 문장 안에서 잘못 들은 낱말만 고칩니다.
+  - words의 낱말과 소리가 비슷하고 문맥에 맞으면 그 낱말로 바꿉니다(예: 「햇빛 3개 남았어」에서 words에 햇반이 있으면 「햇반 3개 남았어」).
+  - 흔한 낱말을 뚜렷하게 잘못 들었으면 고칩니다(예: 「소아가 예약」은 「소아과 예약」).
+- 고치지 않는 것:
+  - 제대로 들은 낱말을 words의 낱말로 바꾸지 않습니다. 소리가 비슷하지 않으면 그대로 둡니다.
+  - 말투, 어순, 띄어쓰기를 다듬지 않고 내용을 더하거나 빼지 않습니다.
+  - 숫자, 날짜, 시각은 후보에 있는 그대로 둡니다.
+- 확실하지 않으면 첫 번째 후보를 그대로 씁니다.`
 
 /** The slice of the SDK used here, so tests can substitute a fake without network access. */
 export interface BetaMessagesLike {
@@ -303,6 +321,18 @@ export class AnthropicClaude implements ClaudePort {
     )
     return { ...validateMenu(parsed), model }
   }
+
+  async fixTranscript(input: SpeechFixInput) {
+    const { parsed, model } = await this.callJson(
+      SPEECH_FIX_SYSTEM,
+      JSON.stringify(input),
+      speechFixSchema as unknown as Record<string, unknown>,
+      2000,
+      'low',
+      CLAUDE_FAST_MODEL,
+    )
+    return { ...validateSpeechFix(parsed), model }
+  }
 }
 
 type Reply<I, O> = O | Error | ((input: I) => O)
@@ -325,6 +355,9 @@ export class FakeClaude implements ClaudePort {
   dinnerReply: Reply<DinnerInput, DinnerResult> = { options: [{ name: 'd1', why: 'w', ingredients: ['i'] }] }
   menuCalls: MenuInput[] = []
   menuReply: Reply<MenuInput, MenuExtraction> = { days: [] }
+  speechFixCalls: SpeechFixInput[] = []
+  /** Defaults to the first candidate unchanged. */
+  speechFixReply: Reply<SpeechFixInput, SpeechFixResult> = (i) => ({ text: i.candidates[0] ?? '' })
 
   constructor(
     public briefing: BriefingResult | Error = { headline: 'h', lines: ['l1'] },
@@ -367,5 +400,10 @@ export class FakeClaude implements ClaudePort {
   async extractMenu(input: MenuInput) {
     this.menuCalls.push(input)
     return { ...answer(this.menuReply, input), model: 'fake' }
+  }
+
+  async fixTranscript(input: SpeechFixInput) {
+    this.speechFixCalls.push(input)
+    return { ...answer(this.speechFixReply, input), model: 'fake' }
   }
 }

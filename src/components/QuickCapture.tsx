@@ -10,6 +10,7 @@ import {
 import { useHousehold, type HouseholdData } from '../data/store'
 import { prepareUpload, UploadError } from '../data/upload'
 import { relativeDay, timeLabel } from '../format'
+import { joinVoice, undoVoiceFix, type VoiceFix } from '../voice/fix'
 import { Button, Checkbox, IconButton, OwnerBadge, Pill, Sheet } from './ui'
 import { VoiceButton } from './VoiceButton'
 
@@ -132,12 +133,39 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
   const [toast, setToast] = useState('')
   const [voiceStatus, setVoiceStatus] = useState<{ text: string; tone: 'info' | 'error' }>({ text: '', tone: 'info' })
   const fileRef = useRef<HTMLInputElement>(null)
-  const appendVoice = (said: string) => setText((prev) => (prev.trim() ? `${prev.trimEnd()} ${said}` : said))
+  /** Set while the field still holds a voice input that Claude corrected, for 「원래대로」. */
+  const [voiceFix, setVoiceFix] = useState<VoiceFix | null>(null)
+  // The recording finishes asynchronously, so the field is read from a ref, not from the render that started it.
+  const textRef = useRef(text)
+  textRef.current = text
+  const typeText = (value: string) => {
+    setText(value)
+    setVoiceFix(null)
+  }
+  const appendVoice = (said: string, heard?: string) => {
+    const base = textRef.current
+    setText(joinVoice(base, said))
+    setVoiceFix(heard ? { base, fixed: said, heard } : null)
+  }
+  const undoFix = () => {
+    const back = voiceFix ? undoVoiceFix(textRef.current, voiceFix) : null
+    if (back !== null) setText(back)
+    setVoiceFix(null)
+  }
   const onVoiceStatus = (text: string, tone: 'info' | 'error') => setVoiceStatus({ text, tone })
   const voiceLine = voiceStatus.text && (
     <p role={voiceStatus.tone === 'error' ? 'alert' : 'status'}
       className={`text-[12px] ${voiceStatus.tone === 'error' ? 'text-terra-2' : 'text-ink-2'}`}>{voiceStatus.text}</p>
   )
+  const fixLine = voiceFix && (
+    <p className="flex flex-wrap items-baseline gap-x-2 text-[12px] text-ink-2">
+      <span className="min-w-0 break-words">{t('voice.heard', { text: voiceFix.heard })}</span>
+      <button type="button" onClick={undoFix} className="shrink-0 font-semibold text-sage underline-offset-2 hover:underline">
+        {t('voice.undoFix')}
+      </button>
+    </p>
+  )
+  const voiceNote = voiceLine || fixLine
   const req = useRef(0)
 
   useEffect(() => {
@@ -160,6 +188,7 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
 
   const runText = async (value: string) => {
     if (!value.trim()) return
+    setVoiceFix(null)
     const id = ++req.current
     setPhase({ step: 'loading', from: 'text' })
     try {
@@ -233,12 +262,12 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
       {phase?.step === 'input' && (
         <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void runText(text) }}>
           <div className="flex items-start gap-2">
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} autoFocus
+            <textarea value={text} onChange={(e) => typeText(e.target.value)} rows={3} autoFocus
               placeholder={t('quick.placeholder')} aria-label={t('quick.title')}
               className="min-w-0 flex-1 resize-none rounded-[var(--radius-field)] border border-sand bg-white px-3.5 py-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-3 focus:border-sage focus:ring-[1.5px] focus:ring-sage" />
-            <VoiceButton onText={appendVoice} onStatus={onVoiceStatus} />
+            <VoiceButton onText={appendVoice} onStatus={onVoiceStatus} onStart={() => setVoiceFix(null)} />
           </div>
-          {voiceLine || <p className="text-[12px] text-ink-2">{t('quick.hint')}</p>}
+          {voiceNote || <p className="text-[12px] text-ink-2">{t('quick.hint')}</p>}
           <Button type="submit" disabled={!text.trim()}><Sparkles size={18} />{t('quick.submit')}</Button>
           <div className="my-1 h-px bg-line" />
           <Button type="button" variant="soft" onClick={pickFile}><Camera size={18} />{t('quick.fromFile')}</Button>
@@ -316,18 +345,18 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
     <>
       <form onSubmit={submitBar} className="flex h-12 w-full items-center gap-1 rounded-full border border-line bg-card pl-4 pr-1.5 shadow-[var(--shadow-card)] focus-within:border-sage">
         <Sparkles size={17} className="shrink-0 text-wisteria" />
-        <input value={text} onChange={(e) => setText(e.target.value)}
+        <input value={text} onChange={(e) => typeText(e.target.value)}
           placeholder={t(fallback === 'todo' ? 'quick.todoPlaceholder' : fallback === 'shopping' ? 'quick.shopPlaceholder' : 'quick.barPlaceholder')}
           aria-label={t('quick.title')}
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-[15px] text-ink outline-none placeholder:text-ink-3" />
-        <VoiceButton size="sm" onText={appendVoice} onStatus={onVoiceStatus} />
+        <VoiceButton size="sm" onText={appendVoice} onStatus={onVoiceStatus} onStart={() => setVoiceFix(null)} />
         <IconButton type="button" label={t('quick.fromFile')} onClick={pickFile} className="h-9 w-9"><Camera size={18} /></IconButton>
         <button type="submit" aria-label={t('quick.submit')} title={t('quick.submit')} disabled={!text.trim()}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sage text-white transition-opacity disabled:opacity-30">
           <ArrowUp size={18} strokeWidth={2.4} />
         </button>
       </form>
-      {voiceLine && <div className="mt-1.5 px-4">{voiceLine}</div>}
+      {voiceNote && <div className="mt-1.5 px-4">{voiceNote}</div>}
       {fileInput}
       {sheet}
       <Toast text={toast} />

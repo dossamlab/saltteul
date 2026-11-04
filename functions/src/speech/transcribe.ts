@@ -2,8 +2,10 @@
 // The app records 16-bit mono PCM itself (LINEAR16), so every device sends the same format; Safari's AAC recordings
 // are not accepted by v1. Nothing is stored: the text goes back to the field and the user presses 「정리」.
 // Household words (speech/vocabulary.ts) go along as phrase hints, and up to SPEECH_ALTERNATIVES candidate sentences
-// come back, best first.
+// come back, best first. Claude (Haiku) then picks or mends one sentence with the same words; its answer is checked
+// (acceptFix) and anything slow, failed or doubtful falls back to the best candidate.
 import { GoogleAuth } from 'google-auth-library'
+import type { SpeechFixInput } from '../claude/inputs'
 
 export class SpeechInputError extends Error {}
 
@@ -105,21 +107,60 @@ export class GoogleSpeech implements SpeechPort {
   }
 }
 
+/** Past this the user is not kept waiting for the correction; the best candidate goes back instead. */
+export const SPEECH_FIX_TIMEOUT_MS = 4000
+
+const numbersOf = (s: string) => s.match(/\d+/g) ?? []
+
 /**
- * `vocabulary` loads the household words; when it fails the recording is still recognised, only without hints.
- * Returns the best candidate as `text`.
+ * Claude's sentence, or null when it should not be trusted: a number no candidate has (3개 must not become 5개), or a
+ * length far outside the candidates' (something made up or cut off).
  */
-export async function runTranscribe(
-  speech: SpeechPort,
-  data: unknown,
-  vocabulary: () => Promise<string[]> = async () => [],
-  warn: (msg: string) => void = () => undefined,
-): Promise<{ text: string }> {
+export function acceptFix(candidates: string[], fixed: string): string | null {
+  const text = tidy(fixed)
+  if (!text || !candidates.length) return null
+  const known = new Set(candidates.flatMap(numbersOf))
+  if (numbersOf(text).some((n) => !known.has(n))) return null
+  const lengths = candidates.map((c) => c.length)
+  if (text.length < Math.min(...lengths) * 0.6 || text.length > Math.max(...lengths) * 1.4 + 6) return null
+  return text
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms)
+    p.then((v) => (clearTimeout(id), resolve(v)), (e: unknown) => (clearTimeout(id), reject(e)))
+  })
+}
+
+export interface TranscribeDeps {
+  speech: SpeechPort
+  /** Household words; when they cannot be read the recording is still recognised, only without hints. */
+  vocabulary?: () => Promise<string[]>
+  /** Claude's correction; left out, the best candidate is returned as it is. */
+  fix?: (input: SpeechFixInput) => Promise<{ text: string }>
+  warn?: (msg: string) => void
+  fixTimeoutMs?: number
+}
+
+/** `text` goes into the field; `heard` is the best candidate, present only when the correction changed it. */
+export async function runTranscribe(deps: TranscribeDeps, data: unknown): Promise<{ text: string; heard?: string }> {
+  const warn = deps.warn ?? (() => undefined)
   const audio = parseSpeechInput(data)
-  const phrases = await vocabulary().catch((e: unknown) => {
+  const words = await (deps.vocabulary ?? (async () => []))().catch((e: unknown) => {
     warn(`speech vocabulary unavailable: ${e instanceof Error ? e.message : e}`)
     return [] as string[]
   })
-  const candidates = await speech.recognize(audio, phrases)
-  return { text: candidates[0] ?? '' }
+  const candidates = await deps.speech.recognize(audio, words)
+  const best = candidates[0] ?? ''
+  if (!best || !deps.fix) return { text: best }
+  try {
+    const out = await withTimeout(deps.fix({ candidates, words }), deps.fixTimeoutMs ?? SPEECH_FIX_TIMEOUT_MS)
+    const fixed = acceptFix(candidates, out.text)
+    if (!fixed) warn('speech fix rejected by the checks')
+    return fixed && fixed !== best ? { text: fixed, heard: best } : { text: best }
+  } catch (e) {
+    warn(`speech fix skipped: ${e instanceof Error ? e.message : e}`)
+    return { text: best }
+  }
 }

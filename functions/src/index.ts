@@ -212,11 +212,19 @@ const speechVocabulary = () => {
   return vocabCache.words
 }
 
-/** transcribe({ audioBase64, sampleRate }) → { text }. 16-bit mono PCM, at most 30 seconds. */
-export const transcribe = onCall({ region: REGION, timeoutSeconds: 60 }, async (req) => {
+/**
+ * transcribe({ audioBase64, sampleRate }) → { text, heard? }. 16-bit mono PCM, at most 30 seconds. `heard` is what
+ * Speech-to-Text heard, sent only when Claude changed it, so the app can offer 「원래대로」.
+ */
+export const transcribe = onCall({ region: REGION, timeoutSeconds: 60, secrets: [ANTHROPIC_API_KEY] }, async (req) => {
   await memberOrThrow(req.auth?.uid)
   try {
-    return await runTranscribe((speechClient ??= new GoogleSpeech(log)), req.data, speechVocabulary, log)
+    return await runTranscribe({
+      speech: (speechClient ??= new GoogleSpeech(log)),
+      vocabulary: speechVocabulary,
+      fix: (input) => claude().fixTranscript(input),
+      warn: log,
+    }, req.data)
   } catch (e) {
     if (e instanceof SpeechInputError) throw new HttpsError('invalid-argument', e.message)
     logger.error('speech failed', e instanceof Error ? e.message : e)

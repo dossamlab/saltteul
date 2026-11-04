@@ -32,6 +32,13 @@ export interface QuickAddInput {
   text: string
 }
 
+export interface SpeechFixInput {
+  /** Speech-to-Text candidate sentences for one recording, best first */
+  candidates: string[]
+  /** Household words (pantry items, routines, chores, shopping, names) the speaker is likely to have said */
+  words: string[]
+}
+
 export interface WeeklyDay {
   day: Ymd
   weekday: number

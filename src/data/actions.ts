@@ -191,7 +191,7 @@ export function saveMonthlyMenu(hid: string, uid: string, month: string, days: M
 export const refreshWeather = () =>
   httpsCallable<void, { status: 'fresh' | 'ok' | 'failed' | 'no-location'; updatedAt: number | null }>(functions, 'refreshWeather', { timeout: 60_000 })()
 export const transcribe = (p: { audioBase64: string; sampleRate: number }) =>
-  httpsCallable<typeof p, { text: string }>(functions, 'transcribe', { timeout: 60_000 })(p)
+  httpsCallable<typeof p, { text: string; heard?: string }>(functions, 'transcribe', { timeout: 60_000 })(p)
 export const extractFromFile = (p: { fileName: string; mimeType: string; dataBase64: string }) =>
   httpsCallable<typeof p, QuickAddResult>(functions, 'extractFromFile', { timeout: 180_000 })(p)
 

@@ -13,10 +13,13 @@ function voiceMessage(e: unknown): string {
 
 /**
  * Tap to record, tap again to stop (or it stops itself at 30 s). The recognised text is handed to `onText`, which only
- * fills the field; the user still presses 「정리」. Hidden where the browser cannot record.
+ * fills the field; the user still presses 「정리」. `heard` comes along when Claude corrected what Speech-to-Text heard.
+ * Hidden where the browser cannot record.
  */
-export function VoiceButton({ onText, onStatus, size = 'md' }: {
-  onText: (text: string) => void
+export function VoiceButton({ onText, onStatus, onStart, size = 'md' }: {
+  onText: (text: string, heard?: string) => void
+  /** Called when a new recording starts. */
+  onStart?: () => void
   /** Short status line for the caller to show ('' clears it). */
   onStatus: (text: string, tone: 'info' | 'error') => void
   size?: 'sm' | 'md'
@@ -45,7 +48,7 @@ export function VoiceButton({ onText, onStatus, size = 'md' }: {
       const { data } = await transcribe(audio)
       if (!alive.current) return
       if (data.text.trim()) {
-        onText(data.text.trim())
+        onText(data.text.trim(), data.heard?.trim() || undefined)
         onStatus('', 'info')
       } else {
         onStatus(t('voice.silent'), 'error')
@@ -61,6 +64,7 @@ export function VoiceButton({ onText, onStatus, size = 'md' }: {
   }
 
   const start = async () => {
+    onStart?.()
     onStatus(t('voice.listening'), 'info')
     setState('recording')
     try {

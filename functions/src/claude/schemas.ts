@@ -264,6 +264,26 @@ export function validateQuickAddRaw(v: unknown): RawQuickAdd {
   return { items, unparsed }
 }
 
+// ── Voice transcript correction ─────────────────────────────────────────────
+
+export interface SpeechFixResult {
+  text: string
+}
+
+export const speechFixSchema = {
+  type: 'object',
+  properties: { text: { type: 'string' } },
+  required: ['text'],
+  additionalProperties: false,
+} as const
+
+export function validateSpeechFix(v: unknown): SpeechFixResult {
+  if (!isObj(v)) throw new InvalidOutputError('speech fix is not an object')
+  const text = str(v.text, 'text').replace(/\s+/g, ' ')
+  if (!text) throw new InvalidOutputError('empty speech fix')
+  return { text }
+}
+
 // ── Growth journal ──────────────────────────────────────────────────────────
 
 export interface JournalResult {
