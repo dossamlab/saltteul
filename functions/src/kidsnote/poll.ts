@@ -217,7 +217,9 @@ export async function pollKidsnote(deps: PollDeps, now: Date = new Date()): Prom
       continue
     }
 
-    const attachments = await downloadAttachments(deps.kidsnote, tokens, report.attachments, deps.log)
+    // Report photos usually show the children (others too), so only their PDFs are read; notice photos are newsletters.
+    const refs = kind === 'report' ? report.attachments?.filter((a) => a.kind === 'pdf') : report.attachments
+    const attachments = await downloadAttachments(deps.kidsnote, tokens, refs, deps.log)
     const readable = !!report.text || attachments.length > 0
     let extraction: KidsnoteExtraction & { model: string | null }
     try {

@@ -145,10 +145,27 @@ describe('pollKidsnote with attachments', () => {
     expect(db.read(`${H}/kidsnote/r1`)).toMatchObject({ text: 'See the newsletter', written: W, createdAt: '2026-10-28T01:00:00.000Z', attachmentCount: 1 })
   })
 
-  it('reads a notice that has only photos', async () => {
+  it('never downloads or sends report photos', async () => {
     const { kidsnote, claude, deps } = setup()
-    kidsnote.reports = [{
-      id: 'r2', written: W, createdAt: '2026-10-28T01:00:00.000Z', text: '', url: null,
+    kidsnote.reports = [
+      { id: 'r2', written: W, createdAt: '2026-10-28T01:00:00.000Z', text: '', url: null, attachments: [{ kind: 'image', urls: ['https://f/a.jpg'], name: null }] },
+      { id: 'r3', written: W, createdAt: '2026-10-28T01:10:00.000Z', text: 'Fun day', url: null, attachments: [{ kind: 'image', urls: ['https://f/b.jpg'], name: null }] },
+    ]
+    kidsnote.files = { 'https://f/a.jpg': JPEG, 'https://f/b.jpg': JPEG }
+    await pollKidsnote(deps, NOW)
+    expect(kidsnote.downloads).toEqual([])
+    expect(claude.extractCalls).toHaveLength(1)
+    expect(claude.extractCalls[0]).toMatchObject({ text: 'Fun day' })
+    expect(claude.extractCalls[0].attachments).toBeUndefined()
+  })
+
+  it('reads a notice that has only photos', async () => {
+    const { db, kidsnote, claude, deps } = setup()
+    db.put(KIDSNOTE_SECRET_PATH, {
+      tokens: TOKENS, children: [{ id: 'c1', name: 'kid', centerId: '501' }], childId: 'c1', connectedAt: 1, connectedBy: 'uH',
+    })
+    kidsnote.notices = [{
+      id: 'n2', written: W, createdAt: '2026-10-28T01:00:00.000Z', text: '', url: null,
       attachments: [{ kind: 'image', urls: ['https://f/a.jpg'], name: null }],
     }]
     kidsnote.files = { 'https://f/a.jpg': JPEG }
