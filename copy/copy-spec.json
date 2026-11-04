@@ -310,7 +310,7 @@
     { "key": "settings.calendarHint", "where": "작은 글씨", "meaning": "「우리집」 캘린더 설정의 캘린더 ID를 붙여 넣으면 날짜 있는 할 일이 오간다", "maxChars": 50 },
     { "key": "settings.calendarId", "where": "입력칸 라벨", "meaning": "캘린더 ID", "maxChars": 8 },
     { "key": "settings.kidsnote", "where": "카드 제목", "meaning": "키즈노트 연결", "maxChars": 8 },
-    {"key": "settings.kidsnoteHint", "where": "작은 글씨", "meaning": "한 번 로그인하면 알림장과 공지사항을 07시부터 22시까지 매시간 확인해 일정과 준비물을 넣어 준다. 비밀번호는 저장하지 않는다", "maxChars": 60, "fixed": "알림장과 공지사항을 아침 7시부터 밤 10시까지 매시간 살펴 일정과 준비물을 챙겨 드려요. 비밀번호는 저장하지 않아요."},
+    {"key": "settings.kidsnoteHint", "where": "작은 글씨", "meaning": "한 번 로그인하면 알림장과 공지사항을 평일 다섯 번, 주말 두 번 확인해 일정과 준비물을 넣어 준다. 비밀번호는 저장하지 않는다", "maxChars": 60, "fixed": "알림장과 공지사항을 평일 다섯 번, 주말 두 번 살펴 일정과 준비물을 챙겨 드려요. 비밀번호는 저장하지 않아요."},
     { "key": "settings.kidsnoteId", "where": "입력칸 라벨", "meaning": "키즈노트 아이디", "maxChars": 10 },
     { "key": "settings.kidsnotePw", "where": "입력칸 라벨", "meaning": "키즈노트 비밀번호", "maxChars": 10 },
     { "key": "settings.kidsnoteConnect", "where": "버튼", "meaning": "키즈노트 연결하기", "maxChars": 10 },

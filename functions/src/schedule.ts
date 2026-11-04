@@ -8,10 +8,11 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 /** Weekday dinner ideas are made at 07:00 (07:15 retries) so the 07:30 morning briefing can carry them. */
 export const DINNER_HOUR = 7
 /**
- * Kids Note reads, KST: on the hour from 07:00 (before the 07:30 briefing) to 22:00, so late-evening posts still land
- * the same night. Claude only reads new posts, so the number of reads does not change Claude usage.
+ * Kids Note reads, KST, kept few because Kids Note has no public API: before the 07:30 briefing, midday, after the
+ * afternoon reports, before the 20:00 briefing and once late for "bring this tomorrow". Weekends have far fewer posts.
+ * Claude only reads new posts, so the number of reads does not change Claude usage. Settings can read at once.
  */
-export const KIDSNOTE_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] as const
+export const KIDSNOTE_HOURS = { weekday: [7, 12, 16, 19, 22], weekend: [9, 19] } as const
 
 /** KST hour, the quarter-hour slot (0/15/30/45) the tick belongs to, and the weekday (0 = Sunday); tolerates a late trigger. */
 export function kstSlot(now: Date): { hour: number; quarter: number; weekday: number } {
@@ -31,7 +32,8 @@ export function dueJobs(now: Date): Job[] {
   const { hour, quarter, weekday } = kstSlot(now)
   const jobs: Job[] = ['calendar']
   if (quarter === 15) jobs.push('weather')
-  if (quarter === 0 && (KIDSNOTE_HOURS as readonly number[]).includes(hour)) jobs.push('kidsnote')
+  const kidsnoteHours: readonly number[] = KIDSNOTE_HOURS[isWeekday(weekday) ? 'weekday' : 'weekend']
+  if (quarter === 0 && kidsnoteHours.includes(hour)) jobs.push('kidsnote')
   if (hour === 7 && quarter === 30) jobs.push('morningBriefing')
   if (hour === DINNER_HOUR && (quarter === 0 || quarter === 15) && isWeekday(weekday)) jobs.push('dinner')
   if (hour === 20 && quarter === 0) {

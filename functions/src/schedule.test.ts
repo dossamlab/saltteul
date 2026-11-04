@@ -13,14 +13,17 @@ describe('dueJobs', () => {
   it('fetches weather at quarter past every hour', () => {
     expect(dueJobs(kst(13, 15))).toEqual(['calendar', 'weather'])
   })
-  it('reads kids note on the hour from 07 to 22 KST', () => {
-    const hours = Array.from({ length: 24 }, (_, h) => h).filter((h) => dueJobs(kst(h, 0)).includes('kidsnote'))
-    expect(hours).toEqual([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])
+  it('reads kids note five times on weekdays and twice on weekends', () => {
+    const hoursOn = (at: (h: number, m: number) => Date) =>
+      Array.from({ length: 24 }, (_, h) => h).filter((h) => dueJobs(at(h, 0)).includes('kidsnote'))
+    expect(hoursOn(kst)).toEqual([7, 12, 16, 19, 22])
+    expect(hoursOn(saturday)).toEqual([9, 19])
+    expect(hoursOn(sunday)).toEqual([9, 19])
     expect(dueJobs(kst(19, 15))).not.toContain('kidsnote')
   })
   it('sends briefings at 07:30 and 20:00', () => {
     expect(dueJobs(kst(7, 30))).toEqual(['calendar', 'morningBriefing'])
-    expect(dueJobs(kst(20, 0))).toEqual(['calendar', 'kidsnote', 'eveningBriefing'])
+    expect(dueJobs(kst(20, 0))).toEqual(['calendar', 'eveningBriefing'])
   })
   it('tolerates a trigger that fires a few minutes late', () => {
     expect(dueJobs(kst(7, 33))).toContain('morningBriefing')
@@ -28,9 +31,9 @@ describe('dueJobs', () => {
     expect(dueJobs(kst(7, 45))).not.toContain('morningBriefing')
   })
   it('replaces the Sunday evening briefing with the weekly preview and the growth journal', () => {
-    expect(dueJobs(sunday(20, 0))).toEqual(['calendar', 'kidsnote', 'weeklyPreview', 'journal'])
+    expect(dueJobs(sunday(20, 0))).toEqual(['calendar', 'weeklyPreview', 'journal'])
     expect(dueJobs(sunday(20, 14))).toContain('journal')
-    expect(dueJobs(saturday(20, 0))).toEqual(['calendar', 'kidsnote', 'eveningBriefing'])
+    expect(dueJobs(saturday(20, 0))).toEqual(['calendar', 'eveningBriefing'])
     expect(dueJobs(sunday(7, 30))).toEqual(['calendar', 'morningBriefing'])
   })
   it('makes dinner ideas at 07:00 on weekdays, retrying at 07:15, before the 07:30 briefing', () => {
