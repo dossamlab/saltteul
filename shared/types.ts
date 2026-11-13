@@ -196,6 +196,8 @@ export interface Settings {
   weather?: { updatedAt: number; days: WeatherDay[]; source?: 'kma' | 'open-meteo' } | null
   /** The child's Kids Note class chosen in settings; null/absent = the class Kids Note has on record. */
   kidsnoteClassId?: string | null
+  /** True once the default packing list was put in packingBase, so emptying the list later does not bring it back. */
+  packingSeeded?: boolean
 }
 
 /** One class of the daycare as Kids Note lists it. */
@@ -285,6 +287,70 @@ export interface IntegrationState {
   /** kidsnote only: the daycare's classes and the child's class on record, refreshed by each poll. */
   classes?: KidsnoteClass[]
   detectedClassId?: string | null
+}
+
+/** Packing list tabs: the child (or children), the wife, the husband, and things the family shares. */
+export type PackTab = 'kid' | 'wife' | 'husband' | 'both'
+/** fixed: n in all; perDay: n for each day; perNight: n for each night. extra is added on top. */
+export type PackRuleKind = 'fixed' | 'perDay' | 'perNight'
+
+export interface PackRule {
+  kind: PackRuleKind
+  n: number
+  extra: number
+  /** Only on trips with at least one night (0 on a day trip, hidden). */
+  overnightOnly: boolean
+  /** Kid tab only: multiplied by the number of children. */
+  perPerson: boolean
+}
+
+/** households/{hid}/packingBase/{id}: one line of the base packing list every new trip is counted from. */
+export interface PackingBaseItem extends PackRule {
+  id: string
+  name: string
+  category: string
+  tab: PackTab
+  order: number
+  /** Reviewed trips in a row that marked this item unused; reset when a trip used it. */
+  unusedStreak?: number
+}
+
+/** households/{hid}/trips/{id}. The last day (return day) is start + nights. */
+export interface Trip {
+  id: string
+  name: string
+  start: Ymd
+  nights: number
+  kids: number
+  /** Where the trip goes (optional); used for the forecast suggestions. */
+  place?: { label: string; lat: number; lon: number } | null
+  createdAt: number
+  createdBy: string
+  /** Set when the review after the trip was finished; the review offer then goes away. */
+  reviewedAt?: number | null
+}
+
+/** households/{hid}/tripItems/{id}: one item of one trip (a document each, so two people can tick at once). */
+export interface TripItem {
+  id: string
+  tripId: string
+  name: string
+  category: string
+  tab: PackTab
+  qty: number
+  /** Still counted from `rule`; false once the count was changed by hand, and for items added by hand. */
+  auto: boolean
+  /** The base rule the count came from (kept so a change of nights or children can recount). */
+  rule?: PackRule | null
+  /** The base list line it came from, for the review after the trip. */
+  baseId?: string | null
+  order: number
+  packed: boolean
+  packedBy?: string | null
+  /** Second tick on the way home. */
+  returned: boolean
+  /** Review after the trip. */
+  review?: 'unused' | 'short' | null
 }
 
 /** households/{hid}/monthNotes/{YYYY-MM}: the shared memo of a month in the month plan. */
