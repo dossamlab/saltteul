@@ -1,10 +1,11 @@
-import { addDoc, collection, deleteDoc, doc, setDoc, updateDoc, writeBatch, type WriteBatch } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, getDocs, query, setDoc, updateDoc, where, writeBatch, type WriteBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
+import { defaultBase, itemsFromBase, recount, streakUpdates, type ReviewProposal } from '../../shared/packing'
 import { applyPantryOp } from '../../shared/pantry'
 import { routineLogId } from '../../shared/routines'
 import type {
-  Anniversary, Chore, Consumable, MenuExtractResult, MonthlyMenu, Nudge, Owner, PantryItem, PantryLog, PantryOp, PrepRule,
-  QuickAddResult, Routine, Settings, ShoppingItem, Todo, Ymd,
+  Anniversary, Chore, Consumable, MenuExtractResult, MonthlyMenu, Nudge, Owner, PackingBaseItem, PantryItem, PantryLog, PantryOp, PrepRule,
+  QuickAddResult, Routine, Settings, ShoppingItem, Todo, Trip, TripItem, Ymd,
 } from '../../shared/types'
 import { db, functions } from '../firebase'
 
@@ -155,7 +156,104 @@ export async function applyPantryOps(
 export const addPantryToShopping = (hid: string, uid: string, p: PantryItem) =>
   addShopping(hid, uid, p.name, { source: 'pantry', pantryId: p.id, ...(p.restockQty > 0 ? { qty: `${p.restockQty}${p.unit || '개'}` } : {}) })
 
-export const addPrepRule = (hid: string, r: Omit<PrepRule, 'id'>) => addDoc(col(hid, 'prepRules'), r)
+// Trips and packing. The base list is seeded with the default kid list the first time it is needed (fixed ids, so two
+// phones doing it at once write the same documents); settings.packingSeeded keeps an emptied list from coming back.
+// A trip copies the base list into its own tripItems; after that the two never change each other.
+export async function ensurePackingBase(hid: string, base: PackingBaseItem[], seeded: boolean | undefined): Promise<PackingBaseItem[]> {
+  if (base.length || seeded) return base
+  const list = defaultBase()
+  const b = writeBatch(db)
+  for (const { id, ...item } of list) b.set(ref(hid, 'packingBase', id), item)
+  b.set(doc(db, `households/${hid}/settings/main`), { packingSeeded: true }, { merge: true })
+  await b.commit()
+  return list
+}
+
+export type TripDraft = Pick<Trip, 'name' | 'start' | 'nights' | 'kids'> & { place: Trip['place'] }
+
+export async function createTrip(hid: string, uid: string, d: TripDraft, base: PackingBaseItem[], seeded: boolean | undefined) {
+  const list = await ensurePackingBase(hid, base, seeded)
+  const tripRef = doc(col(hid, 'trips'))
+  const b = writeBatch(db)
+  b.set(tripRef, clean({ ...d, name: d.name.trim(), place: d.place ?? null, createdAt: now(), createdBy: uid, reviewedAt: null }))
+  for (const item of itemsFromBase(list, d.nights, d.kids)) b.set(doc(col(hid, 'tripItems')), { ...item, tripId: tripRef.id })
+  await b.commit()
+  return tripRef.id
+}
+
+/** Saves the trip; a change of nights or children recounts the lines still counted by rule. */
+export async function updateTrip(hid: string, trip: Trip, d: TripDraft, items: TripItem[]) {
+  const b = writeBatch(db)
+  b.update(ref(hid, 'trips', trip.id), { ...d, name: d.name.trim(), place: d.place ?? null })
+  if (d.nights !== trip.nights || d.kids !== trip.kids) {
+    for (const c of recount(items, d.nights, d.kids)) b.update(ref(hid, 'tripItems', c.id), { qty: c.qty })
+  }
+  await b.commit()
+}
+
+/** Deletes the trip with all its items (read again here, so lines not on screen go too). */
+export async function deleteTrip(hid: string, tripId: string) {
+  const snap = await getDocs(query(col(hid, 'tripItems'), where('tripId', '==', tripId)))
+  const refs = [...snap.docs.map((d) => d.ref), ref(hid, 'trips', tripId)]
+  for (let i = 0; i < refs.length; i += 450) {
+    const b = writeBatch(db)
+    refs.slice(i, i + 450).forEach((r) => b.delete(r))
+    await b.commit()
+  }
+}
+
+export type TripLineDraft = Pick<TripItem, 'name' | 'category' | 'tab' | 'order'>
+
+/** A line added by hand; with alsoBase it is put at the end of the base list too (fixed 1, linked for the review). */
+export async function addTripItem(hid: string, tripId: string, d: TripLineDraft, alsoBase: { order: number } | null) {
+  const b = writeBatch(db)
+  let baseId: string | null = null
+  if (alsoBase) {
+    const baseRef = doc(col(hid, 'packingBase'))
+    baseId = baseRef.id
+    b.set(baseRef, {
+      name: d.name.trim(), category: d.category, tab: d.tab, order: alsoBase.order, kind: 'fixed', n: 1, extra: 0, overnightOnly: false, perPerson: false,
+    })
+  }
+  b.set(doc(col(hid, 'tripItems')), {
+    tripId, name: d.name.trim(), category: d.category, tab: d.tab, order: d.order, qty: 1, auto: false, rule: null, baseId,
+    packed: false, packedBy: null, returned: false, review: null,
+  } satisfies Omit<TripItem, 'id'>)
+  await b.commit()
+}
+
+export const updateTripItem = (hid: string, id: string, patch: Partial<Omit<TripItem, 'id'>>) => updateDoc(ref(hid, 'tripItems', id), clean(patch))
+export const togglePacked = (hid: string, item: TripItem, uid: string) =>
+  updateTripItem(hid, item.id, item.packed ? { packed: false, packedBy: null, returned: false } : { packed: true, packedBy: uid })
+/** A count changed by hand is no longer recounted. */
+export const setTripItemQty = (hid: string, item: TripItem, qty: number) =>
+  updateTripItem(hid, item.id, { qty: Math.max(1, Math.round(qty)), auto: false })
+export const deleteTripItem = (hid: string, id: string) => deleteDoc(ref(hid, 'tripItems', id))
+/** Undo of a delete: the same document comes back. */
+export const restoreTripItem = (hid: string, { id, ...item }: TripItem) => setDoc(ref(hid, 'tripItems', id), item)
+export const tripItemToShopping = (hid: string, uid: string, item: TripItem, qty?: string) =>
+  addShopping(hid, uid, item.name, qty ? { qty } : {})
+
+export type BaseDraft = Omit<PackingBaseItem, 'id' | 'unusedStreak'>
+export const addBaseItem = (hid: string, d: BaseDraft) => addDoc(col(hid, 'packingBase'), clean({ ...d, name: d.name.trim() }))
+export const updateBaseItem = (hid: string, id: string, p: Partial<BaseDraft>) => updateDoc(ref(hid, 'packingBase', id), clean(p))
+export const deleteBaseItem = (hid: string, id: string) => deleteDoc(ref(hid, 'packingBase', id))
+export const restoreBaseItem = (hid: string, { id, ...item }: PackingBaseItem) => setDoc(ref(hid, 'packingBase', id), clean(item))
+
+/** One approved change from the review. */
+export function applyReviewProposal(hid: string, p: ReviewProposal) {
+  return p.kind === 'more' ? updateBaseItem(hid, p.baseId, { n: p.to }) : deleteBaseItem(hid, p.baseId)
+}
+
+/** Ends the review: unused streaks of the base lines (those still there) and the trip marked reviewed. */
+export async function finishReview(hid: string, tripId: string, items: TripItem[], base: PackingBaseItem[]) {
+  const b = writeBatch(db)
+  for (const u of streakUpdates(items, base)) b.update(ref(hid, 'packingBase', u.id), { unusedStreak: u.unusedStreak })
+  b.update(ref(hid, 'trips', tripId), { reviewedAt: now() })
+  await b.commit()
+}
+
+export const addPrepRule =(hid: string, r: Omit<PrepRule, 'id'>) => addDoc(col(hid, 'prepRules'), r)
 export const updatePrepRule = (hid: string, id: string, p: Partial<PrepRule>) => updateDoc(ref(hid, 'prepRules', id), p)
 export const deletePrepRule = (hid: string, id: string) => deleteDoc(ref(hid, 'prepRules', id))
 

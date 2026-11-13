@@ -1,9 +1,10 @@
 import { collection, doc, limit, onSnapshot, orderBy, query, where, type Query } from 'firebase/firestore'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { addDays, householdDate } from '../../shared/householdDate'
+import { tripPhase } from '../../shared/packing'
 import type {
   Anniversary, Briefing, Chore, Consumable, DayMenu, DinnerSuggestion, IntegrationState, JournalEntry, Member, Nudge, Owner, PantryItem,
-  MonthlyMenu, PrepRule, Routine, RoutineLog, Settings, ShoppingItem, Todo, Ymd,
+  MonthlyMenu, PackingBaseItem, PrepRule, Routine, RoutineLog, Settings, ShoppingItem, Todo, Trip, TripItem, Ymd,
 } from '../../shared/types'
 import { useReadySession } from '../auth/session'
 import { t } from '../copy'
@@ -26,6 +27,13 @@ export interface HouseholdData {
   /** Things the house should always have (상비품). */
   pantry: PantryItem[]
   prepRules: PrepRule[]
+  /** Base packing list every new trip is counted from. */
+  packingBase: PackingBaseItem[]
+  /** The base list has arrived (only then may an empty list be seeded). */
+  packingLoaded: boolean
+  trips: Trip[]
+  /** Items of trips that are coming up or under way (a past trip's items load with its screen). */
+  tripItems: TripItem[]
   briefings: Briefing[]
   nudges: Nudge[]
   integrations: IntegrationState[]
@@ -70,6 +78,13 @@ function useList<T>(q: Query | null, deps: unknown[]): [T[], boolean] {
   return [state.items, state.ready]
 }
 
+/** Items of one trip, for its checklist screen (past trips are not in the household data). */
+export function useTripItems(tripId: string): TripItem[] {
+  const { hid } = useHousehold()
+  const [items] = useList<TripItem>(query(collection(db, `households/${hid}/tripItems`), where('tripId', '==', tripId)), [hid, tripId])
+  return items.filter((x) => x.tripId === tripId)
+}
+
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { hid, user } = useReadySession()
   const today = useHouseholdToday()
@@ -86,6 +101,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [consumables] = useList<Consumable>(c('consumables'), [hid])
   const [pantry] = useList<PantryItem>(c('pantry'), [hid])
   const [prepRules] = useList<PrepRule>(c('prepRules'), [hid])
+  const [packingBase, packingLoaded] = useList<PackingBaseItem>(c('packingBase'), [hid])
+  const [trips] = useList<Trip>(c('trips'), [hid])
+  // Firestore 'in' takes up to 30 values; there are never that many trips coming up at once.
+  const liveTripIds = trips.filter((x) => tripPhase(x, today) !== 'past').map((x) => x.id).sort().slice(0, 30)
+  const [liveItems] = useList<TripItem>(
+    liveTripIds.length ? query(c('tripItems'), where('tripId', 'in', liveTripIds)) : null, [hid, liveTripIds.join(',')],
+  )
+  const tripItems = useMemo(() => liveItems.filter((x) => liveTripIds.includes(x.tripId)), [liveItems, liveTripIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
   const [briefings, l4] = useList<Briefing>(query(c('briefings'), orderBy('createdAt', 'desc'), limit(4)), [hid])
   const [nudges] = useList<Nudge>(query(c('nudges'), where('to', '==', user.uid), orderBy('createdAt', 'desc'), limit(30)), [hid])
   const [integrations] = useList<IntegrationState>(c('integrations'), [hid])
@@ -144,10 +167,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return {
       loaded: l1 && l2 && l3 && l4 && l5,
       hid, uid: user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables,
-      pantry, prepRules, briefings, nudges, integrations, journal, dinner, todayMenu, settings, nameOf, me, partner,
+      pantry, prepRules, packingBase, packingLoaded, trips, tripItems, briefings, nudges, integrations, journal, dinner, todayMenu, settings, nameOf, me, partner,
     }
   }, [hid, user.uid, today, members, todos, shopping, routines, routineLogs, chores, anniversaries, consumables, pantry, prepRules,
-    briefings, nudges, integrations, journal, dinner, todayMenu, settings, l1, l2, l3, l4, l5])
+    packingBase, packingLoaded, trips, tripItems, briefings, nudges, integrations, journal, dinner, todayMenu, settings, l1, l2, l3, l4, l5])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

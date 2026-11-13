@@ -5,6 +5,7 @@ import { effectiveCycle, nextDue } from '../../shared/consumables'
 import { diffDays } from '../../shared/householdDate'
 import type { Anniversary, AnniversaryKind, Consumable, PrepRule } from '../../shared/types'
 import { PantrySection } from '../components/PantrySection'
+import { TripSection } from '../components/TripSection'
 import { Button, Card, CardHeader, Empty, Field, IconButton, Pill, Segmented, Sheet } from '../components/ui'
 import { t } from '../copy'
 import {
@@ -223,11 +224,15 @@ function SettingsLink({ onClick }: { onClick: () => void }) {
   )
 }
 
-export function OurHomeScreen({ openSettings, wide = false }: { openSettings: () => void; wide?: boolean }) {
+export function OurHomeScreen({ openSettings, openTrip, openPacking, wide = false }: {
+  openSettings: () => void; openTrip: (id: string) => void; openPacking: () => void; wide?: boolean
+}) {
+  const trips = <TripSection openTrip={openTrip} openPacking={openPacking} />
   if (wide) {
-    // PC: two columns of cards; settings is in the sidebar, so no extra link here.
+    // PC: trips across the top, then two columns of cards; settings is in the sidebar, so no extra link here.
     return (
       <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start gap-5">
+        <div className="col-span-2">{trips}</div>
         <div className="flex flex-col gap-5">
           <AnniversarySection />
           <PantrySection />
@@ -241,6 +246,7 @@ export function OurHomeScreen({ openSettings, wide = false }: { openSettings: ()
   }
   return (
     <div className="flex flex-col gap-4">
+      {trips}
       <AnniversarySection />
       <PantrySection />
       <ConsumableSection />

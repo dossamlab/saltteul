@@ -1,11 +1,13 @@
-import { Baby, CalendarRange, ChevronRight, ShoppingBasket } from 'lucide-react'
+import { Baby, CalendarRange, ChevronRight, Luggage, ShoppingBasket } from 'lucide-react'
 import { useState } from 'react'
 import { choreStatus } from '../../shared/chores'
 import { monthNumber, monthOf, openPlansNow } from '../../shared/monthPlan'
+import { homeTrips, progress } from '../../shared/packing'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
 import type { Todo } from '../../shared/types'
 import { AnniversaryCard, AnniversaryStrip, BriefingCard, DinnerCard, KidsnoteCard, WeatherCard } from '../components/HomeCards'
 import { ChoreList, RoutineChecklist } from '../components/RoutineParts'
+import { tripWhen } from '../components/TripParts'
 import { NudgeSheet, TodoRow, TodoSheet } from '../components/TodoParts'
 import { Card, CardHeader, Checkbox, Empty } from '../components/ui'
 import { t } from '../copy'
@@ -15,6 +17,7 @@ import { ShoppingList, ShoppingSuggestions } from './Shopping'
 import { sortTodos, writeTodoView, type TodoSection } from './Todos'
 
 export type Go = (tab: 'home' | 'todos' | 'shopping' | 'kids' | 'ourhome', section?: TodoSection) => void
+export type OpenTrip = (id: string) => void
 
 function MoreLink({ onClick }: { onClick: () => void }) {
   return (
@@ -202,10 +205,35 @@ function KidsLine({ go }: { go: Go }) {
   )
 }
 
-export function HomeScreen({ go }: { go: Go }) {
+/** Trips from 7 days before the start through the return day: 「{name} D-3 · 짐 18/42」. Tapping opens the checklist. */
+function TripLines({ openTrip, className = 'flex flex-col gap-2' }: { openTrip: OpenTrip; className?: string }) {
+  const h = useHousehold()
+  const list = homeTrips(h.trips, h.today)
+  if (!list.length) return null
+  return (
+    <div className={className}>
+      {list.map((x) => {
+        const p = progress(h.tripItems.filter((i) => i.tripId === x.id))
+        return (
+          <button key={x.id} type="button" onClick={() => openTrip(x.id)}
+            className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-card px-5 py-3.5 text-left shadow-[var(--shadow-card)]">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sage-soft text-sage"><Luggage size={18} /></span>
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">
+              {t('trip.homeLine', { name: x.name, when: tripWhen(x, h.today), packed: p.packed, total: p.total })}
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-ink-3" />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export function HomeScreen({ go, openTrip }: { go: Go; openTrip: OpenTrip }) {
   return (
     <div className="flex flex-col gap-4">
       <AnniversaryStrip />
+      <TripLines openTrip={openTrip} />
       <BriefingCard />
       <WeatherCard collapsible />
       <TodayAllCard go={go} />
@@ -216,10 +244,11 @@ export function HomeScreen({ go }: { go: Go }) {
 }
 
 /** Tablet: everything on one screen in columns (3 in landscape, 2 in portrait). */
-export function TabletHome({ go }: { go: Go }) {
+export function TabletHome({ go, openTrip }: { go: Go; openTrip: OpenTrip }) {
   return (
     <div className="flex flex-col gap-4">
       <AnniversaryStrip />
+      <TripLines openTrip={openTrip} className="grid grid-cols-2 gap-4 xl:grid-cols-3" />
       <div className="grid grid-cols-2 items-start gap-4 xl:grid-cols-3 [@media(orientation:landscape)]:grid-cols-3">
         <div className="flex flex-col gap-4">
           <BriefingCard />
@@ -242,9 +271,10 @@ export function TabletHome({ go }: { go: Go }) {
 }
 
 /** PC (>= 1200px): 12-column grid, three rows of equal-height cards. */
-export function DesktopHome({ go }: { go: Go }) {
+export function DesktopHome({ go, openTrip }: { go: Go; openTrip: OpenTrip }) {
   return (
     <div className="mx-auto grid max-w-[1360px] grid-cols-12 gap-5">
+      <TripLines openTrip={openTrip} className="col-span-12 grid grid-cols-3 gap-5" />
       <BriefingCard large className="col-span-8 h-full" />
       <div className="col-span-4 flex flex-col gap-5">
         <WeatherCard />

@@ -1,5 +1,5 @@
 import { Check, X } from 'lucide-react'
-import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Owner } from '../../shared/types'
 import { t } from '../copy'
@@ -171,4 +171,36 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 
 export function Row({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`flex min-h-12 items-center gap-3 py-1.5 ${className}`}>{children}</div>
+}
+
+/** How long a short notice (with or without 「되돌리기」) stays at the bottom of the screen. */
+export const NOTICE_MS = 5000
+
+/**
+ * A short notice at the bottom of the screen that goes away by itself, optionally with an undo button (deletes write at
+ * once, so the other phone sees them, and undo writes the same document back). Render `node` once in the screen.
+ */
+export function useNotice() {
+  const [state, setState] = useState<{ at: number; text: string; undo?: () => unknown } | null>(null)
+  useEffect(() => {
+    if (!state) return
+    const id = setTimeout(() => setState(null), NOTICE_MS)
+    return () => clearTimeout(id)
+  }, [state])
+  const show = useCallback((text: string, undo?: () => unknown) => setState({ at: Date.now(), text, undo }), [])
+  const node = state && createPortal(
+    <div role="status" className="pointer-events-none fixed inset-x-0 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-[60] flex justify-center px-5">
+      <div className={`pointer-events-auto flex max-w-full items-center gap-3 rounded-full bg-ink py-2 pl-5 ${state.undo ? 'pr-2' : 'pr-5'} text-[14px] font-semibold text-white shadow-[var(--shadow-sheet)]`}>
+        <span className="min-w-0 truncate py-1">{state.text}</span>
+        {state.undo && (
+          <button type="button" onClick={() => { void state.undo!(); setState(null) }}
+            className="h-9 shrink-0 rounded-full bg-white/15 px-3.5 text-[14px] font-semibold text-white">
+            {t('action.undo')}
+          </button>
+        )}
+      </div>
+    </div>,
+    document.body,
+  )
+  return { show, node }
 }

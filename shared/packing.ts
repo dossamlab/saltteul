@@ -218,6 +218,8 @@ export function packingBriefLines(trips: Trip[], items: TripItem[], day: Ymd, t:
 
 /** Categories offered when adding a line, in this order; categories already used in the list come first. */
 export const DEFAULT_CATEGORIES = ['위생', '잠자리', '씻기', '상비약', '먹을 것', '식기', '옷·소품', '기타']
+/** Category a line typed by hand starts in until another is picked. */
+export const OTHER_CATEGORY = '기타'
 
 export function categoryChoices(used: { category: string; order: number }[]): string[] {
   const inUse = groupByCategory(used).map((g) => g.category)

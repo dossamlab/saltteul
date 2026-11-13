@@ -1,5 +1,5 @@
 import { ArrowLeft, Baby, Bell, CheckSquare, Home, House, Settings2, ShoppingBasket } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { togetherDays } from '../shared/anniversaries'
 import { QuickCapture } from './components/QuickCapture'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -11,13 +11,16 @@ import { DesktopHome, HomeScreen, TabletHome, type Go } from './screens/Home'
 import { InboxScreen } from './screens/Inbox'
 import { KidsScreen } from './screens/Kids'
 import { OurHomeScreen } from './screens/OurHome'
+import { PackingBaseScreen } from './screens/PackingBase'
 import { SettingsScreen } from './screens/Settings'
 import { ShoppingScreen } from './screens/Shopping'
 import { TodosScreen, type TodoSection } from './screens/Todos'
+import { TripScreen } from './screens/Trip'
 import { useLayout } from './useLayout'
 
 type Tab = 'home' | 'todos' | 'shopping' | 'kids' | 'ourhome'
-type Overlay = 'settings' | 'inbox' | null
+/** Full screens over the tabs: settings, inbox, the base packing list and one trip's checklist (`trip:{id}`). */
+type Overlay = 'settings' | 'inbox' | 'packing' | `trip:${string}` | null
 
 const TABS: { id: Tab; icon: typeof Home; label: string }[] = [
   { id: 'home', icon: Home, label: 'tab.home' },
@@ -45,7 +48,7 @@ function UnreadBadge({ n, className = '' }: { n: number; className?: string }) {
 }
 
 /** PC (>= 1200px) left sidebar: identity on top, tabs with labels, inbox/settings/member at the bottom. */
-function Sidebar({ tab, overlay, go, open }: { tab: Tab; overlay: Overlay; go: (t: Tab) => void; open: (o: Exclude<Overlay, null>) => void }) {
+function Sidebar({ tab, overlay, go, open }: { tab: Tab; overlay: Overlay; go: (t: Tab) => void; open: (o: 'settings' | 'inbox') => void }) {
   const h = useHousehold()
   const unread = h.nudges.filter((n) => !n.read).length
   const item = (active: boolean) =>
@@ -102,6 +105,8 @@ export function Shell() {
   const [tab, setTab] = useState<Tab>('home')
   const [section, setSection] = useState<TodoSection>('today')
   const [overlay, setOverlay] = useState<Overlay>(null)
+  // The base list opened from a trip goes back to that trip.
+  const [backTo, setBackTo] = useState<Overlay>(null)
   const unread = h.nudges.filter((n) => !n.read).length
   const together = h.anniversaries.find((a) => a.kind === 'together')
   const pc = layout === 'pc'
@@ -115,14 +120,24 @@ export function Shell() {
 
   const go: Go = (next, sec) => {
     setOverlay(null)
+    setBackTo(null)
     setTab(next)
     if (sec) setSection(sec)
     window.scrollTo({ top: 0 })
   }
   const openOverlay = (o: Exclude<Overlay, null>) => {
+    setBackTo(o === 'packing' && overlay?.startsWith('trip:') ? overlay : null)
     setOverlay(o)
     window.scrollTo({ top: 0 })
   }
+  const closeOverlay = useCallback(() => {
+    setOverlay(backTo)
+    setBackTo(null)
+    window.scrollTo({ top: 0 })
+  }, [backTo])
+  const openTrip = (id: string) => openOverlay(`trip:${id}`)
+  const tripId = overlay?.startsWith('trip:') ? overlay.slice(5) : null
+  const overlayTitle = tripId ? h.trips.find((x) => x.id === tripId)?.name ?? '' : overlay ? t(`${overlay}.title`) : ''
 
   const homeTitle = (
     <div className="flex flex-col">
@@ -144,15 +159,17 @@ export function Shell() {
   )
 
   let body: ReactNode
-  if (overlay === 'settings') body = <SettingsScreen wide={pc} />
+  if (tripId) body = <TripScreen key={tripId} tripId={tripId} onClose={closeOverlay} openPacking={() => openOverlay('packing')} wide={layout !== 'phone'} />
+  else if (overlay === 'packing') body = <PackingBaseScreen wide={layout !== 'phone'} />
+  else if (overlay === 'settings') body = <SettingsScreen wide={pc} />
   else if (overlay === 'inbox') body = pc ? <div className="mx-auto max-w-[720px]"><InboxScreen /></div> : <InboxScreen />
   else {
     body =
-      tab === 'home' ? (pc ? <DesktopHome go={go} /> : layout === 'tablet' ? <TabletHome go={go} /> : <HomeScreen go={go} />)
+      tab === 'home' ? (pc ? <DesktopHome go={go} openTrip={openTrip} /> : layout === 'tablet' ? <TabletHome go={go} openTrip={openTrip} /> : <HomeScreen go={go} openTrip={openTrip} />)
       : tab === 'todos' ? <TodosScreen section={section} onSection={setSection} wide={pc} detailed={layout !== 'phone'} />
       : tab === 'shopping' ? <ShoppingScreen wide={pc} />
       : tab === 'kids' ? <KidsScreen wide={pc} />
-      : <OurHomeScreen openSettings={() => setOverlay('settings')} wide={pc} />
+      : <OurHomeScreen openSettings={() => openOverlay('settings')} openTrip={openTrip} openPacking={() => openOverlay('packing')} wide={pc} />
   }
 
   if (!h.loaded) {
@@ -166,15 +183,19 @@ export function Shell() {
 
   if (pc) {
     const maxW = overlay === 'inbox' ? 'max-w-[720px]'
+      : tripId || overlay === 'packing' ? 'max-w-[760px]'
       : overlay === 'settings' || tab === 'shopping' || tab === 'ourhome' ? 'max-w-[1200px]'
       : 'max-w-[1360px]'
-    const pcTitle = overlay ? t(`${overlay}.title`) : tab === 'home' ? formatDay(h.today) : t(`tab.${tab}`)
+    const pcTitle = overlay ? overlayTitle : tab === 'home' ? formatDay(h.today) : t(`tab.${tab}`)
     return (
       <div className="flex min-h-full">
         <Sidebar tab={tab} overlay={overlay} go={(id) => go(id)} open={openOverlay} />
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 bg-canvas/85 backdrop-blur-xl">
             <div className={`mx-auto flex h-20 items-center gap-6 px-8 ${maxW} box-content`}>
+              {(tripId || overlay === 'packing') && (
+                <IconButton label={t('action.back')} onClick={closeOverlay} className="-mr-4"><ArrowLeft size={22} /></IconButton>
+              )}
               <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold tracking-tight text-ink">{pcTitle}</h1>
               {!overlay && <div className="w-[min(480px,45%)] shrink-0"><QuickCapture variant="bar" fallback={fallback} /></div>}
             </div>
@@ -186,7 +207,7 @@ export function Shell() {
   }
 
   const header = overlay
-    ? <Header title={<span className="text-[20px] font-bold tracking-tight">{t(`${overlay}.title`)}</span>} onBack={() => setOverlay(null)} />
+    ? <Header title={<span className="block truncate text-[20px] font-bold tracking-tight">{overlayTitle}</span>} onBack={closeOverlay} />
     : (
       <Header
         title={tab === 'home' ? homeTitle : <span className="text-[20px] font-bold tracking-tight">{t(`tab.${tab}`)}</span>}
