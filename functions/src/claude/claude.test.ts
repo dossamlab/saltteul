@@ -207,6 +207,68 @@ describe('runBriefing', () => {
     expect(fcm.sent).toHaveLength(2)
   })
 
+  describe('packing line on the evening before a trip', () => {
+    // 20:00 KST on 2026-10-28; the trip leaves on the 29th.
+    const EVENING = new Date('2026-10-28T11:00:00Z')
+    const pt = makeT({
+      'push.briefing.titleEvening': 'Evening',
+      'brief.fb.headlineEvening': 'Tomorrow',
+      'brief.fb.empty': 'Nothing today',
+      'brief.fb.packingLeft': 'Not packed {n} ({tabs})',
+      'trip.tab.kid': 'kid', 'trip.tab.wife': 'mom',
+    })
+    function seedTrip(db: FakeFirestore, start = '2026-10-29') {
+      db.put(`${H}/trips/trip1`, { name: 'Sea', start, nights: 1, kids: 1, createdAt: 1, createdBy: 'uH' })
+      const line = (id: string, tab: string, packed: boolean, qty = 1) =>
+        db.put(`${H}/tripItems/${id}`, { tripId: 'trip1', name: id, category: 'c', tab, qty, auto: true, order: 1, packed, returned: false })
+      line('a', 'kid', false)
+      line('b', 'kid', false)
+      line('c', 'kid', true)
+      line('d', 'kid', false, 0) // overnight-only on a day trip: hidden, not counted
+      line('e', 'wife', false)
+      db.put(`${H}/tripItems/other`, { tripId: 'trip2', name: 'x', category: 'c', tab: 'kid', qty: 1, auto: true, order: 1, packed: false, returned: false })
+    }
+
+    it('adds the line after the Claude lines without telling Claude', async () => {
+      const db = new FakeFirestore()
+      seedHousehold(db)
+      seedTrip(db)
+      const claude = new FakeClaude({ headline: 'Trip tomorrow', lines: ['Field trip'] })
+      const b = await runBriefing({ db: db.asAdmin, messaging: new FakeMessaging(), claude, t: pt }, 'evening', EVENING)
+      expect(b.lines).toEqual(['Field trip', 'Not packed 3 (kid 2, mom 1)'])
+      expect(claude.briefingCalls).toHaveLength(1)
+      expect(JSON.stringify(claude.briefingCalls[0])).not.toContain('Not packed')
+      expect(db.read(`${H}/briefings/2026-10-28_evening`)!.lines).toEqual(b.lines)
+    })
+
+    it('also adds it to the fallback and replaces the "nothing today" line', async () => {
+      const db = new FakeFirestore()
+      seedHousehold(db)
+      seedTrip(db)
+      const failing = await runBriefing({ db: db.asAdmin, messaging: new FakeMessaging(), claude: new FakeClaude(new Error('down')), t: pt }, 'evening', EVENING)
+      expect(failing.lines.at(-1)).toBe('Not packed 3 (kid 2, mom 1)')
+
+      await db.doc(`${H}/todos/t1`).delete()
+      const claude = new FakeClaude()
+      const quiet = await runBriefing({ db: db.asAdmin, messaging: new FakeMessaging(), claude, t: pt }, 'evening', EVENING)
+      expect(claude.briefingCalls).toHaveLength(0)
+      expect(quiet.lines).toEqual(['Not packed 3 (kid 2, mom 1)'])
+    })
+
+    it('stays out of the morning briefing and other evenings', async () => {
+      const db = new FakeFirestore()
+      seedHousehold(db)
+      seedTrip(db, '2026-10-30')
+      const evening = await runBriefing({ db: db.asAdmin, messaging: new FakeMessaging(), claude: new FakeClaude(), t: pt }, 'evening', EVENING)
+      expect(evening.lines).toEqual(['l1'])
+      const db2 = new FakeFirestore()
+      seedHousehold(db2)
+      seedTrip(db2, '2026-10-28')
+      const morning = await runBriefing({ db: db2.asAdmin, messaging: new FakeMessaging(), claude: new FakeClaude(), t }, 'morning', MORNING)
+      expect(morning.lines).toEqual(['l1'])
+    })
+  })
+
   it('skips Claude when there is nothing to say', async () => {
     const db = new FakeFirestore()
     seedHousehold(db)
