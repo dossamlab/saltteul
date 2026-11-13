@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeT } from '../../../shared/copy'
-import { FakeClaude } from '../claude/client'
-import type { KidsnoteExtraction, RawQuickItem } from '../claude/schemas'
+import { FakeClaude, QUICK_ADD_SYSTEM } from '../claude/client'
+import { quickAddSchema, validateQuickAddRaw, type KidsnoteExtraction, type RawQuickItem } from '../claude/schemas'
 import { FakeFirestore } from '../testing/fakeFirestore'
 import { extractionToQuickItems, parseFileInput, runExtractFromFile } from './fromFile'
 import { finalizeQuickAdd, parseQuickText, QuickInputError, runQuickAdd } from './quickAdd'
@@ -17,7 +17,7 @@ const ALREADY_DEADLINE = '참가비 납부 마감'
 const t = makeT({ 'kidsnote.deadlineTitle': 'Due: {title}' })
 
 const item = (p: Partial<RawQuickItem>): RawQuickItem => ({
-  kind: 'todo', title: 'x', date: null, time: null, owner: null, note: null, qty: null, refId: null, prepItems: [], amount: null, month: null, ...p,
+  kind: 'todo', title: 'x', date: null, time: null, owner: null, note: null, qty: null, refId: null, prepItems: [], amount: null, month: null, endDate: null, endTime: null, ...p,
 })
 
 function seed() {
@@ -130,6 +130,41 @@ describe('finalizeQuickAdd', () => {
     ])
   })
 
+  it('reads ranges and drops an end that is not after the start', () => {
+    const out = finalizeQuickAdd({
+      items: [
+        item({ title: 'Trip', date: '2026-11-03', endDate: '2026-11-05' }),
+        item({ title: 'Meeting', date: '2026-10-29', time: '15:00', endTime: '17:00' }),
+        item({ title: 'Overnight', date: '2026-10-29', time: '22:00', endDate: '2026-10-30', endTime: '02:00' }),
+        item({ title: 'Backwards', date: '2026-11-05', endDate: '2026-11-03' }),
+        item({ title: 'Same day', date: '2026-11-05', endDate: '2026-11-05' }),
+        item({ title: 'Early end', date: '2026-10-29', time: '15:00', endTime: '15:00' }),
+        item({ title: 'Too far end', date: '2026-11-05', endDate: '2027-12-01' }),
+        item({ title: 'No start', endDate: '2026-11-05', endTime: '10:00' }),
+      ],
+      unparsed: [],
+    }, ctx)
+    expect(out.items.map((x) => (x.kind === 'todo' ? [x.title, x.date, x.time, x.endDate ?? null, x.endTime ?? null] : null))).toEqual([
+      ['Trip', '2026-11-03', null, '2026-11-05', null],
+      ['Meeting', '2026-10-29', '15:00', null, '17:00'],
+      ['Overnight', '2026-10-29', '22:00', '2026-10-30', '02:00'],
+      ['Backwards', '2026-11-05', null, null, null],
+      ['Same day', '2026-11-05', null, null, null],
+      ['Early end', '2026-10-29', '15:00', null, null],
+      ['Too far end', '2026-11-05', null, null, null],
+      ['No start', null, null, null, null],
+    ])
+    // Single-day items carry no end fields at all.
+    expect(out.items[3]).not.toHaveProperty('endDate')
+  })
+
+  it('gives a todo without an owner to the speaker, or to both when the speaker is unknown', () => {
+    const raw = { items: [item({ title: 'Mine' }), item({ title: 'Hers', owner: 'wife' }), item({ title: 'Odd', owner: 'boss' })], unparsed: [] }
+    const owners = (o: ReturnType<typeof finalizeQuickAdd>) => o.items.map((x) => (x.kind === 'todo' ? x.owner : null))
+    expect(owners(finalizeQuickAdd(raw, { ...ctx, speaker: { role: 'husband', name: 'Minu' } }))).toEqual(['husband', 'wife', 'husband'])
+    expect(owners(finalizeQuickAdd(raw, { ...ctx, speaker: null }))).toEqual(['both', 'wife', 'both'])
+  })
+
   it('returns at most 20 items', () => {
     const items = Array.from({ length: 30 }, (_, i) => item({ title: `t${i}` }))
     expect(finalizeQuickAdd({ items, unparsed: [] }, ctx).items).toHaveLength(20)
@@ -148,7 +183,8 @@ describe('runQuickAdd', () => {
     const out = await runQuickAdd({ db: db.asAdmin, claude }, 'uW', { text: '  call the pediatrician at 3  ' }, NOW)
     expect(out).toEqual({
       items: [
-        { kind: 'todo', title: 'Pediatrician', date: TODAY, time: '15:00', owner: 'both', note: null },
+        // No owner said: the speaker's (the wife's) todo.
+        { kind: 'todo', title: 'Pediatrician', date: TODAY, time: '15:00', owner: 'wife', note: null },
         { kind: 'routineDone', routineId: 'r1', title: 'Vitamins' },
       ],
       unparsed: [],
@@ -267,5 +303,29 @@ describe('runExtractFromFile', () => {
     expect(out.items[0]).toMatchObject({ kind: 'todo', title: 'Picnic', date: '2026-11-04' })
     expect(out.items[0].kind === 'todo' && out.items[0].prepItems?.[0]).toEqual({ name: 'Mat', source: 'rule' })
     expect(JSON.stringify([...db.store.docs])).toBe(before)
+  })
+})
+
+describe('quick add schema', () => {
+  it('requires every property and allows no others', () => {
+    const one = quickAddSchema.properties.items.items
+    expect([...one.required].sort()).toEqual(Object.keys(one.properties).sort())
+    expect(one.additionalProperties).toBe(false)
+    expect(one.required).toEqual(expect.arrayContaining(['endDate', 'endTime']))
+  })
+
+  it('tells Claude about ranges and the speaker default', () => {
+    for (const word of ['endDate', 'endTime', 'speaker.role', 'speaker가 null']) expect(QUICK_ADD_SYSTEM).toContain(word)
+  })
+
+  it('reads endDate and endTime, blank or missing as null', () => {
+    const raw = validateQuickAddRaw({
+      items: [
+        { kind: 'todo', title: 'Trip', date: '2026-11-03', endDate: ' 2026-11-05 ', endTime: '', time: null },
+        { kind: 'todo', title: 'Old answer' },
+      ],
+      unparsed: [],
+    })
+    expect(raw.items.map((x) => [x.endDate, x.endTime])).toEqual([['2026-11-05', null], [null, null]])
   })
 })

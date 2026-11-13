@@ -5,6 +5,7 @@ import { diffDays, householdDate, isValidYmd, seoulTime, weekdayOf } from '../..
 import { diffMonths, isYm, monthOf } from '../../../shared/monthPlan'
 import { routinesForDay } from '../../../shared/routines'
 import { applyPantryOp } from '../../../shared/pantry'
+import { normalizeRange } from '../../../shared/todoDays'
 import type { Chore, Owner, PantryItem, PrepItem, QuickAddResult, QuickItem, Routine, RoutineLog, ShoppingItem, Ymd } from '../../../shared/types'
 import type { ClaudePort } from '../claude/client'
 import type { QuickAddInput } from '../claude/inputs'
@@ -42,6 +43,8 @@ export function quickDate(v: string | null, today: Ymd): Ymd | null {
 
 export interface QuickContext {
   today: Ymd
+  /** Who wrote the line; a todo without a stated owner is theirs (both when unknown). */
+  speaker?: QuickAddInput['speaker']
   routines: QuickAddInput['routines']
   chores: QuickAddInput['chores']
   pantry: (QuickAddInput['pantry'][number] & { restockQty?: number })[]
@@ -73,6 +76,8 @@ export function finalizeQuickAdd(raw: RawQuickAdd, ctx: QuickContext): Pick<Quic
         const ahead = isYm(it.month) ? diffMonths(monthOf(ctx.today), it.month) : -1
         const month = !date && ahead >= 0 && ahead <= 12 ? it.month : null
         if (!once(`todo|${norm(title)}|${date ?? month ?? ''}`)) break
+        const time = it.time && HHMM.test(it.time) ? it.time : null
+        const end = normalizeRange({ date, time, endDate: quickDate(it.endDate, ctx.today), endTime: it.endTime })
         const prepSeen = new Set<string>()
         const prepItems: PrepItem[] = it.prepItems
           .filter((p) => !prepSeen.has(norm(p)) && !!prepSeen.add(norm(p)))
@@ -81,11 +86,13 @@ export function finalizeQuickAdd(raw: RawQuickAdd, ctx: QuickContext): Pick<Quic
           kind: 'todo',
           title,
           date,
-          time: it.time && HHMM.test(it.time) ? it.time : null,
-          owner: OWNERS.includes(it.owner as Owner) ? (it.owner as Owner) : 'both',
+          time,
+          owner: OWNERS.includes(it.owner as Owner) ? (it.owner as Owner) : ctx.speaker?.role ?? 'both',
           note: cut(it.note, 200),
           ...(prepItems.length ? { prepItems } : {}),
           ...(month ? { month } : {}),
+          ...(end.endDate ? { endDate: end.endDate } : {}),
+          ...(end.endTime ? { endTime: end.endTime } : {}),
         })
         break
       }

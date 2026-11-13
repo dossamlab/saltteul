@@ -92,6 +92,10 @@ export const QUICK_ADD_SYSTEM = `당신은 부부가 함께 쓰는 살림 앱 �
 - todo: 할 일이나 일정. title은 짧게(예: 「소아과 예약」). 날짜가 있으면 date(YYYY-MM-DD, today와 weekday로 계산), 시각이 있으면 time(24시간제 HH:mm).
   날짜나 시각이 없으면 null. 「저녁에」처럼 시각이 막연하면 time은 null로 두고 note에 그 표현을 적습니다. 챙길 물건이 함께 적혀 있으면 prepItems에 넣습니다.
   「이번 달 안에」「이달 중」「다음 달에」처럼 날짜 없이 달만 정한 일은 date를 null로 두고 month에 그 달(YYYY-MM)을 씁니다. 날짜가 있거나 달을 말하지 않으면 month는 null.
+  「다음 주 화요일부터 목요일까지 출장」「18일~20일 제주」처럼 며칠에 걸친 일은 하나의 todo로 두고, 시작일을 date에, 끝나는 날(그날 포함)을 endDate(YYYY-MM-DD)에 씁니다.
+  「3시부터 5시까지」처럼 끝나는 시각이 있으면 endTime(24시간제 HH:mm)에 씁니다. endTime은 endDate가 있으면 그날의 시각, 없으면 date의 시각입니다.
+  끝을 말하지 않았거나 끝나는 날이 시작일과 같으면 endDate는 null, 끝나는 시각을 말하지 않았으면 endTime은 null입니다.
+  「매주 화요일」처럼 되풀이되는 일정은 가장 가까운 날짜 하나로 넣습니다.
 - shopping: 살 물건. title은 물건 이름만, 수량이 적혀 있으면 qty(예: 「2개」). openShopping에 이미 있는 물건은 넣지 않습니다.
 - routineDone: 오늘 루틴을 했다는 말(예: 「영양제 먹었어」). routines에서 맞는 것의 id를 refId에, 그 이름을 title에 씁니다. doneToday가 true인 루틴은 넣지 않습니다.
 - choreDone: 집안일을 했다는 말(예: 「화장실 청소 끝」). chores에서 맞는 것의 id를 refId에, 그 이름을 title에 씁니다.
@@ -106,9 +110,10 @@ export const QUICK_ADD_SYSTEM = `당신은 부부가 함께 쓰는 살림 앱 �
   - 상비품이 아닌 kind에서는 amount를 null로 둡니다.
 
 담당(owner)은 todo에만 씁니다. 다른 종류는 null.
-- 「나」「내가」「제가」는 speaker.role입니다.
+- 「나」「내」「내가」「제가」는 speaker.role입니다.
 - 「남편」「아빠」 또는 names.husband는 husband, 「아내」「엄마」「와이프」 또는 names.wife는 wife입니다.
-- 「같이」「우리」「둘이」는 both. 담당이 드러나지 않으면 both로 둡니다.
+- 「우리」「같이」「둘이」「가족」과 아이 행사(어린이집 행사, 아이 병원 등)는 both입니다.
+- 누구 일인지 드러나지 않으면 글을 쓴 사람의 일로 보고 speaker.role을 씁니다. speaker가 null이면 both로 둡니다.
 
 그 밖에:
 - 한 글에 여러 항목이 있으면 모두 나눕니다(예: 「우유랑 계란 사고 내일 3시 소아과」는 shopping 2개와 todo 1개).
