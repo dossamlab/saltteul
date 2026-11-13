@@ -1,11 +1,20 @@
 import { addDays, diffDays, seoulDate, seoulTime } from '../../../shared/householdDate'
-import type { Todo, Ymd } from '../../../shared/types'
-import type { CalEvent, EventInput } from './client'
+import { normalizeRange } from '../../../shared/todoDays'
+import type { Owner, Todo, Ymd } from '../../../shared/types'
+import type { CalEvent, CalTime, EventInput } from './client'
 
 export const TZ = 'Asia/Seoul'
 /** Prefix put on the event title when the todo is done (a symbol, not a sentence). */
 export const DONE_PREFIX = '✓ '
 const TIMED_EVENT_MINUTES = 60
+
+/** Google Calendar event colours per owner: tangerine, sage, peacock. */
+export const OWNER_COLOR: Record<Owner, string> = { wife: '6', husband: '2', both: '7' }
+
+/** Owner of an event pulled in for the first time; other colours and no colour mean both. */
+export function ownerFromColor(colorId: string | null | undefined): Owner {
+  return colorId === OWNER_COLOR.wife ? 'wife' : colorId === OWNER_COLOR.husband ? 'husband' : 'both'
+}
 
 /** Todo as stored, plus the bookkeeping field the calendar pull writes. */
 export type TodoDoc = Todo & { calendarUpdated?: number | null }
@@ -16,7 +25,11 @@ export interface CalendarFields {
   time: string | null
   done: boolean
   note: string | null
+  endDate: Ymd | null
+  endTime: string | null
 }
+
+type TimeFields = Pick<Todo, 'date' | 'time' | 'endDate' | 'endTime'>
 
 function plusMinutes(date: Ymd, time: string, minutes: number): { date: Ymd; time: string } {
   const [h, m] = time.split(':').map(Number)
@@ -28,47 +41,84 @@ function plusMinutes(date: Ymd, time: string, minutes: number): { date: Ymd; tim
   return { date: addDays(date, dayShift), time: `${hh}:${mm}` }
 }
 
+const at = (p: { date: Ymd; time: string }): CalTime => ({ dateTime: `${p.date}T${p.time}:00`, timeZone: TZ })
+
+/**
+ * Start and end of the event for a dated todo. All-day: the end is the day after the last day (Google's end is
+ * exclusive). Timed: endTime on endDate ?? date, else 60 minutes after the start time on the last day.
+ */
+function eventTimes(t: TimeFields & { date: Ymd }): { start: CalTime; end: CalTime } {
+  const { endDate, endTime } = normalizeRange({ date: t.date, time: t.time ?? null, endDate: t.endDate, endTime: t.endTime })
+  const last = endDate ?? t.date
+  if (!t.time) return { start: { date: t.date }, end: { date: addDays(last, 1) } }
+  return {
+    start: at({ date: t.date, time: t.time }),
+    end: at(endTime ? { date: last, time: endTime } : plusMinutes(last, t.time, TIMED_EVENT_MINUTES)),
+  }
+}
+
 /** Event body for a dated todo; null when the todo has no date (it stays app-only). */
-export function todoToEvent(todo: Pick<Todo, 'id' | 'title' | 'note' | 'date' | 'time' | 'done'>): EventInput | null {
+export function todoToEvent(
+  todo: Pick<Todo, 'id' | 'title' | 'note' | 'date' | 'time' | 'done' | 'owner' | 'endDate' | 'endTime'>,
+): EventInput | null {
   if (!todo.date) return null
   const summary = `${todo.done ? DONE_PREFIX : ''}${todo.title}`
   const description = todo.note ?? null
-  if (!todo.time) {
-    return { summary, description, start: { date: todo.date }, end: { date: addDays(todo.date, 1) }, saltteulId: todo.id }
-  }
-  const end = plusMinutes(todo.date, todo.time, TIMED_EVENT_MINUTES)
-  return {
-    summary,
-    description,
-    start: { dateTime: `${todo.date}T${todo.time}:00`, timeZone: TZ },
-    end: { dateTime: `${end.date}T${end.time}:00`, timeZone: TZ },
-    saltteulId: todo.id,
-  }
+  const { start, end } = eventTimes({ ...todo, date: todo.date })
+  return { summary, description, start, end, colorId: OWNER_COLOR[todo.owner] ?? OWNER_COLOR.both, saltteulId: todo.id }
 }
 
 export function sameEvent(a: EventInput | null, b: EventInput | null): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
-/** Todo fields read from a calendar event. All-day → date only; timed → KST date and time. */
+const parseAt = (s: string | null | undefined): Date | null => {
+  const d = s ? new Date(s) : null
+  return d && !Number.isNaN(d.getTime()) ? d : null
+}
+
+/**
+ * Todo fields read from a calendar event. All-day → date only, the exclusive end read back as the last day; timed →
+ * KST date and time, and an end time unless the end is the app's default (60 minutes after the start time on the
+ * start day or a later day, which then becomes the last day).
+ */
 export function eventToFields(ev: CalEvent): CalendarFields | null {
   if (ev.status === 'cancelled' || !ev.start) return null
   let date: Ymd | null = null
   let time: string | null = null
+  let endDate: Ymd | null = null
+  let endTime: string | null = null
   if (ev.start.date) {
     date = ev.start.date
+    if (ev.end?.date) endDate = addDays(ev.end.date, -1)
   } else if (ev.start.dateTime) {
-    const at = new Date(ev.start.dateTime)
-    if (Number.isNaN(at.getTime())) return null
-    date = seoulDate(at)
-    time = seoulTime(at)
+    const start = parseAt(ev.start.dateTime)
+    if (!start) return null
+    date = seoulDate(start)
+    time = seoulTime(start)
+    const end = parseAt(ev.end?.dateTime)
+    if (end) {
+      const e = { date: seoulDate(end), time: seoulTime(end) }
+      const startTime = time
+      const defaultLast = [e.date, addDays(e.date, -1)].find((d) => {
+        const p = plusMinutes(d, startTime, TIMED_EVENT_MINUTES)
+        return d >= date! && p.date === e.date && p.time === e.time
+      })
+      endDate = defaultLast ?? e.date
+      endTime = defaultLast ? null : e.time
+    }
   }
   if (!date) return null
+  const range = normalizeRange({ date, time, endDate, endTime })
   const raw = (ev.summary ?? '').trim()
   const done = raw.startsWith(DONE_PREFIX.trim())
   const title = done ? raw.slice(DONE_PREFIX.trim().length).trim() : raw
-  return { title, date, time, done, note: ev.description?.trim() || null }
+  return { title, date, time, done, note: ev.description?.trim() || null, ...range }
 }
+
+/** Same end as far as the calendar is concerned (an end time equal to the default counts as none). */
+const sameEnd = (a: TimeFields & { date: Ymd }, b: TimeFields & { date: Ymd }) =>
+  JSON.stringify(eventTimes(a).end) === JSON.stringify(eventTimes(b).end)
 
 export function fieldsEqual(todo: TodoDoc, f: CalendarFields): boolean {
   return (
@@ -76,7 +126,8 @@ export function fieldsEqual(todo: TodoDoc, f: CalendarFields): boolean {
     (todo.date ?? null) === f.date &&
     (todo.time ?? null) === f.time &&
     !!todo.done === f.done &&
-    (todo.note?.trim() || null) === f.note
+    (todo.note?.trim() || null) === f.note &&
+    sameEnd({ ...todo, date: f.date }, f)
   )
 }
 

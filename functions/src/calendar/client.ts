@@ -16,6 +16,7 @@ export interface CalEvent {
   end?: CalTime | null
   updated?: string | null // RFC3339
   saltteulId?: string | null // extendedProperties.private.saltteulId
+  colorId?: string | null
 }
 
 export interface EventInput {
@@ -23,6 +24,8 @@ export interface EventInput {
   description?: string | null
   start: CalTime
   end: CalTime
+  /** Google event colour of the owner (see OWNER_COLOR). */
+  colorId: string
   saltteulId: string
 }
 
@@ -61,6 +64,7 @@ function fromApi(e: calendar_v3.Schema$Event): CalEvent {
     end: e.end ?? null,
     updated: e.updated ?? null,
     saltteulId: e.extendedProperties?.private?.saltteulId ?? null,
+    colorId: e.colorId ?? null,
   }
 }
 
@@ -70,6 +74,7 @@ function toApi(ev: EventInput): calendar_v3.Schema$Event {
     description: ev.description ?? null,
     start: { date: ev.start.date ?? null, dateTime: ev.start.dateTime ?? null, timeZone: ev.start.timeZone ?? null },
     end: { date: ev.end.date ?? null, dateTime: ev.end.dateTime ?? null, timeZone: ev.end.timeZone ?? null },
+    colorId: ev.colorId,
     extendedProperties: { private: { saltteulId: ev.saltteulId } },
   }
 }

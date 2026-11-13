@@ -2,7 +2,7 @@ import type { Firestore } from 'firebase-admin/firestore'
 import { householdDate } from '../../../shared/householdDate'
 import { HID } from '../household'
 import { SyncTokenExpiredError, type CalEvent, type CalendarPort, type ChangeSet } from './client'
-import { decidePull, type TodoDoc } from './mapping'
+import { decidePull, ownerFromColor, type TodoDoc } from './mapping'
 import { calendarIdOf } from './push'
 
 export interface PullSummary {
@@ -72,7 +72,10 @@ export async function pullCalendar(db: Firestore, cal: CalendarPort, now: Date =
           note: f.note ?? '',
           date: f.date,
           time: f.time,
-          owner: 'both',
+          endDate: f.endDate,
+          endTime: f.endTime,
+          // Only a new todo takes its owner from the event colour; later pulls never change the owner.
+          owner: ownerFromColor(ev.colorId),
           done: f.done,
           doneBy: null,
           doneAt: f.done ? action.updatedAt : null,
@@ -96,6 +99,8 @@ export async function pullCalendar(db: Firestore, cal: CalendarPort, now: Date =
           note: f.note ?? '',
           date: f.date,
           time: f.time,
+          endDate: f.endDate,
+          endTime: f.endTime,
           done: f.done,
           ...(prevDone !== f.done ? { doneAt: f.done ? action.updatedAt : null, doneBy: null } : {}),
           calendarEventId: ev.id,
