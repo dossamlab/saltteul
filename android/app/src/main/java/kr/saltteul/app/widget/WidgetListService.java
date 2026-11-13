@@ -2,6 +2,7 @@ package kr.saltteul.app.widget;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
@@ -76,10 +77,13 @@ public class WidgetListService extends RemoteViewsService {
             WidgetLogic.Row r = rows.get(position);
             if (r.type == WidgetLogic.Row.SECTION) {
                 RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_section);
-                boolean progress = WidgetLogic.SECTION_ROUTINE.equals(r.key) && r.total > 0;
-                v.setTextViewText(R.id.row_section, progress
-                        ? c.getString(R.string.widget_routineProgress, String.valueOf(r.count), String.valueOf(r.total))
-                        : c.getString(sectionTitle(r.key)));
+                v.setTextViewText(R.id.row_section, sectionText(r));
+                return v;
+            }
+            if (r.type == WidgetLogic.Row.CHIPS) return chipsRow(r);
+            if (r.type == WidgetLogic.Row.SUMMARY) {
+                RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_summary);
+                v.setTextViewText(R.id.row_summary, summaryText(r));
                 return v;
             }
             if (r.type == WidgetLogic.Row.NOTE) {
@@ -99,13 +103,26 @@ public class WidgetListService extends RemoteViewsService {
             }
             if (WidgetLogic.TARGET_PANTRY.equals(r.target)) return pantryRow(r);
             RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_item);
-            v.setTextViewText(R.id.row_title, r.title == null ? "" : r.title);
+            boolean tablet = WidgetLogic.KIND_TABLET.equals(kind);
+            String title = tablet ? WidgetLogic.displayTitle(r.title, r.source) : r.title == null ? "" : r.title;
+            v.setTextViewText(R.id.row_title, title);
             v.setTextColor(R.id.row_title, ContextCompat.getColor(c, r.checked ? R.color.widget_ink_3 : R.color.widget_ink));
             v.setImageViewResource(R.id.row_check, r.checked ? R.drawable.widget_check_on : R.drawable.widget_check_off);
-            String sub = subtitle(r);
+            String sub = subtitle(r, !tablet);
             v.setTextViewText(R.id.row_sub, sub);
             v.setViewVisibility(R.id.row_sub, sub.isEmpty() ? View.GONE : View.VISIBLE);
-            v.setContentDescription(R.id.row_check_area, r.title == null ? "" : r.title);
+            String owner = WidgetRenderer.ownerLabel(c, snap, r.owner);
+            if (tablet) {
+                // The owner shows as the checkbox colour instead of a text line; titles get two lines.
+                // A transparent filter leaves the ticked box (filled sage with a white tick) as drawn.
+                v.setInt(R.id.row_check, "setColorFilter",
+                        r.checked ? Color.TRANSPARENT : ContextCompat.getColor(c, ownerColor(r.owner)));
+                v.setInt(R.id.row_title, "setMaxLines", 2);
+                v.setViewVisibility(R.id.row_dot, "kidsnote".equals(r.source) ? View.VISIBLE : View.GONE);
+                v.setContentDescription(R.id.row_check_area, owner == null ? title : title + ", " + owner);
+            } else {
+                v.setContentDescription(R.id.row_check_area, title);
+            }
 
             Intent fill = new Intent();
             fill.putExtra(ToggleReceiver.EXTRA_TARGET, r.target);
@@ -147,7 +164,53 @@ public class WidgetListService extends RemoteViewsService {
             return v;
         }
 
-        private String subtitle(WidgetLogic.Row r) {
+        /** Two routine chips, tinted by owner; tapping one ticks that routine. */
+        private RemoteViews chipsRow(WidgetLogic.Row r) {
+            RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_row_chips);
+            int[] ids = {R.id.row_chip_1, R.id.row_chip_2};
+            for (int i = 0; i < ids.length; i++) {
+                if (r.items == null || i >= r.items.size()) {
+                    v.setViewVisibility(ids[i], View.INVISIBLE);
+                    continue;
+                }
+                WidgetLogic.Row it = r.items.get(i);
+                String title = it.title == null ? "" : it.title;
+                v.setViewVisibility(ids[i], View.VISIBLE);
+                v.setTextViewText(ids[i], title);
+                v.setInt(ids[i], "setBackgroundResource", chipBackground(it.owner));
+                String owner = WidgetRenderer.ownerLabel(c, snap, it.owner);
+                v.setContentDescription(ids[i], owner == null ? title : title + ", " + owner);
+                Intent fill = new Intent();
+                fill.putExtra(ToggleReceiver.EXTRA_TARGET, it.target);
+                fill.putExtra(ToggleReceiver.EXTRA_ID, it.id);
+                fill.putExtra(ToggleReceiver.EXTRA_CHECKED, it.checked);
+                v.setOnClickFillInIntent(ids[i], fill);
+            }
+            return v;
+        }
+
+        /** "우유, 햇반 +3개 더" or "물티슈 부족 · 우유 기한 1일". */
+        private String summaryText(WidgetLogic.Row r) {
+            boolean pantry = WidgetLogic.SECTION_PANTRY.equals(r.key);
+            StringBuilder b = new StringBuilder();
+            if (r.items != null) {
+                for (WidgetLogic.Row it : r.items) {
+                    if (b.length() > 0) b.append(pantry ? " · " : ", ");
+                    b.append(it.title == null ? "" : it.title);
+                    if (pantry) b.append(' ').append(pantryState(it));
+                }
+            }
+            if (r.count > 0) b.append(' ').append(c.getString(R.string.widget_more, String.valueOf(r.count)));
+            return b.toString();
+        }
+
+        private String pantryState(WidgetLogic.Row it) {
+            if (it.low) return c.getString(R.string.widget_pantryLow);
+            if (it.expired) return c.getString(R.string.widget_pantryExpired);
+            return c.getString(R.string.widget_pantryExpirySoon, String.valueOf(it.expiryDays == null ? 0 : it.expiryDays));
+        }
+
+        private String subtitle(WidgetLogic.Row r, boolean withOwner) {
             StringBuilder b = new StringBuilder();
             if (r.date != null && day != null && !r.date.equals(day) && WidgetLogic.isYmd(r.date)) {
                 b.append(WidgetRenderer.relativeDayLabel(c, r.date, day));
@@ -156,7 +219,7 @@ public class WidgetListService extends RemoteViewsService {
                 if (b.length() > 0) b.append(' ');
                 b.append(r.time);
             }
-            String owner = WidgetRenderer.ownerLabel(c, snap, r.owner);
+            String owner = withOwner ? WidgetRenderer.ownerLabel(c, snap, r.owner) : null;
             if (owner != null) {
                 if (b.length() > 0) b.append(" · ");
                 b.append(owner);
@@ -166,18 +229,35 @@ public class WidgetListService extends RemoteViewsService {
 
         private String noteText(WidgetLogic.Row r) {
             if (WidgetLogic.NOTE_MORE.equals(r.key)) return c.getString(R.string.widget_more, String.valueOf(r.count));
-            if (WidgetLogic.NOTE_PANTRY_ENOUGH.equals(r.key)) {
-                return c.getString(R.string.widget_pantryEnough, String.valueOf(r.count));
-            }
             return c.getString(R.string.widget_allDone);
         }
 
-        private static int sectionTitle(String key) {
-            if (WidgetLogic.SECTION_ROUTINE.equals(key)) return R.string.widget_routineTitle;
-            if (WidgetLogic.SECTION_KIDSNOTE.equals(key)) return R.string.widget_kidsnoteTitle;
-            if (WidgetLogic.SECTION_SHOPPING.equals(key)) return R.string.widget_shoppingTitle;
-            if (WidgetLogic.SECTION_PANTRY.equals(key)) return R.string.widget_pantryTitle;
-            return R.string.widget_todayTitle;
+        private String sectionText(WidgetLogic.Row r) {
+            if (WidgetLogic.SECTION_ROUTINE.equals(r.key)) {
+                return r.total > 0
+                        ? c.getString(R.string.widget_routineProgress, String.valueOf(r.count), String.valueOf(r.total))
+                        : c.getString(R.string.widget_routineTitle);
+            }
+            if (WidgetLogic.SECTION_KIDSNOTE.equals(r.key)) return c.getString(R.string.widget_kidsnoteTitle);
+            if (WidgetLogic.SECTION_PANTRY.equals(r.key)) return c.getString(R.string.widget_pantryTitle);
+            if (WidgetLogic.SECTION_SHOPPING.equals(r.key)) {
+                return r.count > 0 ? c.getString(R.string.widget_shoppingCount, String.valueOf(r.count))
+                        : c.getString(R.string.widget_shoppingTitle);
+            }
+            return r.count > 0 ? c.getString(R.string.widget_todayCount, String.valueOf(r.count))
+                    : c.getString(R.string.widget_todayTitle);
+        }
+
+        private static int ownerColor(String owner) {
+            if ("husband".equals(owner)) return R.color.widget_owner_husband;
+            if ("wife".equals(owner)) return R.color.widget_owner_wife;
+            return R.color.widget_owner_both;
+        }
+
+        private static int chipBackground(String owner) {
+            if ("husband".equals(owner)) return R.drawable.widget_chip_husband;
+            if ("wife".equals(owner)) return R.drawable.widget_chip_wife;
+            return R.drawable.widget_chip_both;
         }
 
         @Override
@@ -187,8 +267,8 @@ public class WidgetListService extends RemoteViewsService {
 
         @Override
         public int getViewTypeCount() {
-            // section, note, checkbox item, pantry item, undo
-            return 5;
+            // section, note, checkbox item, pantry item, undo, routine chips, summary
+            return 7;
         }
 
         @Override

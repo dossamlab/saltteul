@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Tablet board. Header: date, weather and update time on one line, then the D-day pill and a one-line briefing.
-  Body: two columns (todos and routines | Kids Note, shopping, pantry) when the widget is wide; the renderer hides the
-  right column and fills the left list with everything when it is narrow.
+  Tablet board. Header: date and weather on one line, then the D-day pill and a one-line briefing.
+  Body: two columns (todos and routine chips | Kids Note, shopping and pantry lines) when the widget is wide; the
+  renderer hides the right column and fills the left list with everything when it is narrow.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -53,15 +53,6 @@
                     android:maxLines="1"
                     android:textColor="@color/widget_ink_2"
                     android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/widget_updated"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:maxLines="1"
-                    android:textColor="@color/widget_ink_3"
-                    android:textSize="11sp" />
             </LinearLayout>
 
             <LinearLayout

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tablet: shopping or pantry names joined on one line (two at most). -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_summary"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:maxLines="2"
+    android:paddingTop="4dp"
+    android:paddingBottom="6dp"
+    android:textColor="@color/widget_ink"
+    android:textSize="13sp" />

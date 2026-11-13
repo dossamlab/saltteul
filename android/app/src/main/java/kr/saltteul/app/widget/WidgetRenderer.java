@@ -143,9 +143,6 @@ public final class WidgetRenderer {
                 v.setTextViewText(R.id.widget_footer_count,
                         c.getString(R.string.widget_leftCount, String.valueOf(shopping)));
                 v.setOnClickPendingIntent(R.id.widget_footer, open);
-            } else {
-                v.setTextViewText(R.id.widget_updated,
-                        c.getString(R.string.widget_updatedAt, WidgetLogic.seoulTime(s.fetchedAt)));
             }
         }
 

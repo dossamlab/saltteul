@@ -37,8 +37,6 @@ public final class WidgetLogic {
     public static final String NOTE_ALL_DONE = "allDone";
     /** "+N more" under a capped section (count in Row.count). */
     public static final String NOTE_MORE = "more";
-    /** Pantry items that need nothing, folded into one line (count in Row.count). */
-    public static final String NOTE_PANTRY_ENOUGH = "pantryEnough";
 
     /** Tablet board columns: everything in one list (narrow), or todos+routines left and the rest right. */
     public static final String COLUMN_ALL = "all";
@@ -49,10 +47,13 @@ public final class WidgetLogic {
 
     static final int DASHBOARD_TODOS = 3;
     static final int TODO_WIDGET_ROWS = 4;
-    static final int TABLET_TODOS = 6;
+    static final int TABLET_TODOS = 3;
     static final int TABLET_KIDSNOTE = 3;
+    /** Names in the one-line shopping and pantry summaries. */
     static final int TABLET_SHOPPING = 6;
-    static final int TABLET_PANTRY = 8;
+    static final int TABLET_PANTRY = 4;
+    /** Routine chips side by side in one tablet row. */
+    static final int TABLET_CHIPS_PER_ROW = 2;
 
     /** Expiry within this many days (or already past) shows a badge (shared/pantry.ts EXPIRY_SOON_DAYS). */
     static final int EXPIRY_SOON_DAYS = 7;
@@ -362,6 +363,10 @@ public final class WidgetLogic {
         public static final int NOTE = 2;
         /** Undo line for the routine last ticked on a widget (target routine, checked true, so a tap unticks it). */
         public static final int UNDO = 3;
+        /** Tablet: up to TABLET_CHIPS_PER_ROW open routines as tappable chips (in items). */
+        public static final int CHIPS = 4;
+        /** Tablet: one line of names (key SECTION_SHOPPING or SECTION_PANTRY, rows in items, hidden ones in count). */
+        public static final int SUMMARY = 5;
 
         public final int type;
         /** SECTION_* for sections, NOTE_* for notes. */
@@ -374,6 +379,8 @@ public final class WidgetLogic {
         public String date;
         public String time;
         public String owner;
+        /** Todo source ('kidsnote', 'calendar', ...). */
+        public String source;
         public String consumableId;
         public String pantryId;
         /**
@@ -385,12 +392,37 @@ public final class WidgetLogic {
         public boolean low;
         public Integer expiryDays;
         public boolean expired;
-        /** NOTE_MORE / NOTE_PANTRY_ENOUGH count; routine section: done (count) of total. */
+        /**
+         * NOTE_MORE and SUMMARY: hidden count. Routine section: done (count) of total. Today, shopping and pantry
+         * sections: how many there are.
+         */
         public int count;
         public int total;
+        /** CHIPS and SUMMARY rows: the item rows they stand for. */
+        public List<Row> items;
 
         Row(int type) {
             this.type = type;
+        }
+
+        static Row section(String key, int count) {
+            Row r = section(key);
+            r.count = count;
+            return r;
+        }
+
+        static Row chips(List<Row> routines) {
+            Row r = new Row(CHIPS);
+            r.items = routines;
+            return r;
+        }
+
+        static Row summary(String key, List<Row> items, int hidden) {
+            Row r = new Row(SUMMARY);
+            r.key = key;
+            r.items = items;
+            r.count = hidden;
+            return r;
         }
 
         static Row section(String key) {
@@ -440,6 +472,7 @@ public final class WidgetLogic {
             r.date = t.date;
             r.time = t.time;
             r.owner = t.owner;
+            r.source = t.source;
             r.checked = t.done;
             return r;
         }
@@ -504,7 +537,21 @@ public final class WidgetLogic {
         return out;
     }
 
-    /** Open kidsnote todos dated today or later, soonest first. */
+    /**
+     * Title as the tablet shows it: Kids Note todos lose their "[...]" prefix (a dot marks the source instead),
+     * so the part that says what to do is not cut off.
+     */
+    public static String displayTitle(String title, String source) {
+        if (title == null) return "";
+        String t = title.trim();
+        if ("kidsnote".equals(source) && t.startsWith("[")) {
+            int end = t.indexOf(']');
+            if (end > 0 && end < t.length() - 1) return t.substring(end + 1).trim();
+        }
+        return t;
+    }
+
+    /** Open kidsnote todos dated on or after day, soonest first. */
     public static List<Snapshot.Todo> upcomingKidsnote(Snapshot s, String day, int limit) {
         List<Snapshot.Todo> out = new ArrayList<>();
         for (Snapshot.Todo t : s.todos) {
@@ -564,12 +611,6 @@ public final class WidgetLogic {
         return rows;
     }
 
-    /**
-     * The tablet board. Left column: today's open todos, then today's routines that are not done (the section title
-     * carries done/total) and an undo line for undoRoutineId when it is done today. Right column: Kids Note, open
-     * shopping, and only the pantry items that are low or expiring, with the calm ones folded into one count line.
-     * Capped sections end with a "+N more" note. COLUMN_ALL is left then right in one list.
-     */
     /** The routine to offer an undo for: the one ticked on a widget at tickedAt, within ROUTINE_UNDO_MS of now. */
     public static String undoRoutine(String routineId, long tickedAt, long now) {
         if (routineId == null || tickedAt <= 0) return null;
@@ -577,6 +618,14 @@ public final class WidgetLogic {
         return age >= 0 && age <= ROUTINE_UNDO_MS ? routineId : null;
     }
 
+    /**
+     * The tablet board, kept short so each line can be read. Left column: up to TABLET_TODOS of today's open todos
+     * (section count = all of them, the rest in a "+N more" note), then today's open routines as chips, two per row
+     * (the section title carries done/total), and an undo line for undoRoutineId when it is done today. Right column:
+     * Kids Note todos from tomorrow on (today's are already on the left), then one line of open shopping names and one
+     * line of pantry items that are low or expiring; a section is left out when it has nothing. COLUMN_ALL is left
+     * then right in one list.
+     */
     public static List<Row> tabletRows(Snapshot s, String day, String column, String undoRoutineId) {
         List<Row> rows = new ArrayList<>();
         if (s == null || !Snapshot.STATUS_OK.equals(s.status)) return rows;
@@ -584,7 +633,7 @@ public final class WidgetLogic {
         boolean right = !COLUMN_LEFT.equals(column);
         if (left) {
             List<Snapshot.Todo> today = openTodayTodos(s, day);
-            rows.add(Row.section(SECTION_TODAY));
+            rows.add(Row.section(SECTION_TODAY, today.size()));
             if (today.isEmpty()) rows.add(Row.note(NOTE_ALL_DONE));
             for (int i = 0; i < today.size() && i < TABLET_TODOS; i++) rows.add(Row.todo(today.get(i)));
             if (today.size() > TABLET_TODOS) rows.add(Row.note(NOTE_MORE, today.size() - TABLET_TODOS));
@@ -593,7 +642,13 @@ public final class WidgetLogic {
             if (!routines.isEmpty()) {
                 List<Snapshot.Routine> open = openRoutines(s, day);
                 rows.add(Row.routineSection(routines.size() - open.size(), routines.size()));
-                for (Snapshot.Routine r : open) rows.add(Row.routine(r, false));
+                for (int i = 0; i < open.size(); i += TABLET_CHIPS_PER_ROW) {
+                    List<Row> pair = new ArrayList<>();
+                    for (int j = i; j < open.size() && j < i + TABLET_CHIPS_PER_ROW; j++) {
+                        pair.add(Row.routine(open.get(j), false));
+                    }
+                    rows.add(Row.chips(pair));
+                }
                 if (undoRoutineId != null) {
                     for (Snapshot.Routine r : routines) {
                         if (r.id.equals(undoRoutineId) && isRoutineDone(s, r.id, day)) rows.add(Row.undo(r));
@@ -602,25 +657,26 @@ public final class WidgetLogic {
             }
         }
         if (right) {
-            List<Snapshot.Todo> kids = upcomingKidsnote(s, day, TABLET_KIDSNOTE);
+            List<Snapshot.Todo> kids = upcomingKidsnote(s, addDays(day, 1), TABLET_KIDSNOTE);
             if (!kids.isEmpty()) {
                 rows.add(Row.section(SECTION_KIDSNOTE));
                 for (Snapshot.Todo t : kids) rows.add(Row.todo(t));
             }
             List<Snapshot.Shop> shop = openShopping(s);
             if (!shop.isEmpty()) {
-                rows.add(Row.section(SECTION_SHOPPING));
-                for (int i = 0; i < shop.size() && i < TABLET_SHOPPING; i++) rows.add(Row.shop(shop.get(i)));
-                if (shop.size() > TABLET_SHOPPING) rows.add(Row.note(NOTE_MORE, shop.size() - TABLET_SHOPPING));
+                List<Row> names = new ArrayList<>();
+                for (int i = 0; i < shop.size() && i < TABLET_SHOPPING; i++) names.add(Row.shop(shop.get(i)));
+                rows.add(Row.section(SECTION_SHOPPING, shop.size()));
+                rows.add(Row.summary(SECTION_SHOPPING, names, shop.size() - names.size()));
             }
-            if (!s.pantry.isEmpty()) {
-                List<Snapshot.Pantry> needed = new ArrayList<>();
-                for (Snapshot.Pantry p : sortPantry(s.pantry, day)) if (isLow(p) || expiresSoon(p, day)) needed.add(p);
-                rows.add(Row.section(SECTION_PANTRY));
-                for (int i = 0; i < needed.size() && i < TABLET_PANTRY; i++) rows.add(Row.pantry(needed.get(i), day));
-                if (needed.size() > TABLET_PANTRY) rows.add(Row.note(NOTE_MORE, needed.size() - TABLET_PANTRY));
-                int calm = s.pantry.size() - needed.size();
-                if (calm > 0) rows.add(Row.note(NOTE_PANTRY_ENOUGH, calm));
+            List<Row> needed = new ArrayList<>();
+            for (Snapshot.Pantry p : sortPantry(s.pantry, day)) {
+                if (isLow(p) || expiresSoon(p, day)) needed.add(Row.pantry(p, day));
+            }
+            if (!needed.isEmpty()) {
+                List<Row> shown = new ArrayList<>(needed.subList(0, Math.min(needed.size(), TABLET_PANTRY)));
+                rows.add(Row.section(SECTION_PANTRY, needed.size()));
+                rows.add(Row.summary(SECTION_PANTRY, shown, needed.size() - shown.size()));
             }
         }
         return rows;

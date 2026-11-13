@@ -499,7 +499,6 @@
   "widget.pantry.description": "햇반, 물티슈처럼 늘 있어야 할 물건을 세고 바로 하나 써요",
   "widget.pantry.name": "살뜰 상비품",
   "widget.pantryEmpty": "앱의 「우리 집」에서 상비품을 등록해 주세요",
-  "widget.pantryEnough": "넉넉한 상비품 {n}개",
   "widget.pantryExpired": "기한 지남",
   "widget.pantryExpirySoon": "기한 {days}일",
   "widget.pantryLow": "부족",
@@ -510,12 +509,13 @@
   "widget.routineProgress": "오늘 루틴 {done}/{total}",
   "widget.routineTitle": "오늘 루틴",
   "widget.routineUndo": "↶ {title} 체크 취소",
+  "widget.shoppingCount": "장보기 {n}",
   "widget.shoppingTitle": "장보기",
   "widget.signIn": "앱을 열어 로그인해 주세요",
   "widget.tablet.description": "키즈노트 일정부터 장보기까지 한눈에 확인해요",
   "widget.tablet.name": "살뜰 태블릿 보드",
+  "widget.todayCount": "오늘 할 일 {n}",
   "widget.todayTitle": "오늘 할 일",
   "widget.todo.description": "남은 할 일과 루틴을 바로 챙겨요",
-  "widget.todo.name": "살뜰 할 일",
-  "widget.updatedAt": "{time} 갱신"
+  "widget.todo.name": "살뜰 할 일"
 }
