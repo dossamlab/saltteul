@@ -58,10 +58,12 @@ describe('buildWeeklyInput', () => {
     const db = new FakeFirestore()
     seed(db)
     seedExtras(db)
+    // A multi-day todo that started on Sunday is also Monday's.
+    db.put(`${H}/todos/t6`, { title: 'Trip', date: '2026-11-01', endDate: '2026-11-02', owner: 'husband', done: false, source: 'manual', updatedAt: 1 })
     const input = buildWeeklyInput(await loadSnapshot(db.asAdmin, SUNDAY_EVENING), SUNDAY_EVENING)
     expect(input).toMatchObject({ from: '2026-11-02', to: '2026-11-08', names: { husband: 'Minu', wife: 'Jieun', both: '' }, undatedOpenCount: 1 })
     expect(input.days.map((d) => [d.day, d.weekday, d.todos.map((x) => x.title)])).toEqual([
-      ['2026-11-02', 1, []],
+      ['2026-11-02', 1, ['Trip']],
       ['2026-11-03', 2, ['Picnic', 'Dentist']],
       ['2026-11-04', 3, []],
       ['2026-11-05', 4, []],

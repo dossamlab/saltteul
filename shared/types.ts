@@ -19,6 +19,10 @@ export interface Todo {
   note?: string
   date?: Ymd | null
   time?: string | null // 'HH:mm'
+  /** Last day of a multi-day todo (inclusive); only set when after `date`. */
+  endDate?: Ymd | null
+  /** 'HH:mm' end time on `endDate ?? date`; only with `time`. */
+  endTime?: string | null
   /** Month plan ('YYYY-MM') while there is no date; cleared when a date is set. */
   month?: string | null
   owner: Owner
@@ -211,7 +215,11 @@ export interface KidsnoteClass {
  * the app shows a confirmation list and writes the items the user keeps.
  */
 export type QuickItem =
-  | { kind: 'todo'; title: string; date: Ymd | null; time: string | null; owner: Owner; note?: string | null; prepItems?: PrepItem[]; month?: string | null }
+  | {
+      kind: 'todo'; title: string; date: Ymd | null; time: string | null; owner: Owner; note?: string | null; prepItems?: PrepItem[]; month?: string | null
+      /** Present only for a range ("18일~20일", "3시부터 5시까지"). */
+      endDate?: Ymd | null; endTime?: string | null
+    }
   | { kind: 'shopping'; name: string; qty: string | null; note: string | null }
   | { kind: 'routineDone'; routineId: string; title: string }
   | { kind: 'choreDone'; choreId: string; title: string }

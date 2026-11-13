@@ -5,6 +5,7 @@ import { choreNextDue } from '../../../shared/chores'
 import { dueSoon } from '../../../shared/consumables'
 import { addDays, diffDays, householdDate, weekdayOf } from '../../../shared/householdDate'
 import { isMonthPlan } from '../../../shared/monthPlan'
+import { occursOn } from '../../../shared/todoDays'
 import type { Briefing, Todo } from '../../../shared/types'
 import type { T } from '../copy'
 import { HID } from '../household'
@@ -39,7 +40,7 @@ export function buildWeeklyInput(s: HouseholdSnapshot, now: Date): WeeklyInput {
     return {
       day,
       weekday: weekdayOf(day),
-      todos: open.filter((t) => t.date === day).map(brief).sort(byTime),
+      todos: open.filter((t) => occursOn(t, day)).map(brief).sort(byTime),
       weather: s.settings.weather?.days.find((w) => w.day === day) ?? null,
     }
   })

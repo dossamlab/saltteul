@@ -50,6 +50,17 @@ describe('buildBriefingInput', () => {
     expect(i.routinesLeft).toEqual([])
   })
 
+  it('lists a multi-day todo on each of its days', () => {
+    const trip: HouseholdSnapshot = {
+      ...snap,
+      todos: [{ id: 'm', title: '출장', date: '2026-10-27', endDate: '2026-10-29', owner: 'husband', done: false, source: 'manual', updatedAt: 0 }],
+    }
+    expect(buildBriefingInput(trip, morning, 'morning').focusTodos.map((t) => t.title)).toEqual(['출장'])
+    const eve = buildBriefingInput(trip, evening, 'evening')
+    expect([eve.focusTodos.length, eve.todayLeft.length]).toEqual([1, 1])
+    expect(buildBriefingInput(trip, new Date('2026-10-29T11:00:00Z'), 'evening').focusTodos).toEqual([])
+  })
+
   it('looks at tomorrow in the evening and lists open routines', () => {
     const i = buildBriefingInput(snap, evening, 'evening')
     expect(i.focusDay).toBe('2026-10-29')

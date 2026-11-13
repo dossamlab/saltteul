@@ -5,6 +5,7 @@ import { addDays, householdDate } from './householdDate'
 import { isMonthPlan, isPlanReminderDay, monthNumber, monthOf, openPlansNow } from './monthPlan'
 import { daysToExpiry, expiresSoon, isLow, qtyLabel, sortPantry } from './pantry'
 import { isRoutineDone, routinesForDay } from './routines'
+import { occursOn } from './todoDays'
 import type {
   Anniversary, Chore, Consumable, DinnerSuggestion, Member, Owner, PantryItem, PrepItem, Routine, RoutineLog, Settings, ShoppingItem, Todo, WeatherDay, Ymd,
 } from './types'
@@ -39,7 +40,7 @@ export interface BriefingInput {
   focusDay: Ymd // morning: today, evening: tomorrow
   names: Record<Owner, string>
   weather: WeatherDay | null // for focusDay
-  focusTodos: BriefTodo[] // todos dated focusDay, not done
+  focusTodos: BriefTodo[] // todos on focusDay (multi-day ones on each of their days), not done
   todayLeft: BriefTodo[] // evening only: today's todos still open
   undatedOpenCount: number
   routinesLeft: { title: string; owner: Owner }[] // evening only
@@ -84,8 +85,8 @@ export function buildBriefingInput(s: HouseholdSnapshot, now: Date, slot: 'morni
     focusDay,
     names: { husband, wife, both: '' },
     weather: s.settings.weather?.days.find((d) => d.day === focusDay) ?? null,
-    focusTodos: open.filter((t) => t.date === focusDay).map(brief).sort(byTime),
-    todayLeft: slot === 'evening' ? open.filter((t) => t.date === day).map(brief).sort(byTime) : [],
+    focusTodos: open.filter((t) => occursOn(t, focusDay)).map(brief).sort(byTime),
+    todayLeft: slot === 'evening' ? open.filter((t) => occursOn(t, day)).map(brief).sort(byTime) : [],
     undatedOpenCount: open.filter((t) => !t.date && !isMonthPlan(t)).length,
     routinesLeft:
       slot === 'evening'
