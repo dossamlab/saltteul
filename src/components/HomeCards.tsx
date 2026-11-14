@@ -2,6 +2,7 @@ import { Cake, ChevronDown, CloudDrizzle, CloudSnow, Cloud, CloudSun, Heart, Ref
 import { useState } from 'react'
 import { togetherDays, upcoming } from '../../shared/anniversaries'
 import { seoulDate, seoulTime } from '../../shared/householdDate'
+import { todoLastDay } from '../../shared/todoDays'
 import type { Briefing, WeatherDay } from '../../shared/types'
 import { t } from '../copy'
 import { refreshWeather, undoKidsnoteBatch } from '../data/actions'
@@ -249,7 +250,7 @@ export function DinnerCard({ className = '' }: { className?: string }) {
 export function KidsnoteCard({ className = '' }: { className?: string }) {
   const h = useHousehold()
   const items = h.todos
-    .filter((x) => x.source === 'kidsnote' && x.date && x.date >= h.today && !x.done)
+    .filter((x) => x.source === 'kidsnote' && (todoLastDay(x) ?? '') >= h.today && !x.done)
     .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
     .slice(0, 4)
   const lastBatch = items.find((x) => x.kidsnoteBatchId)?.kidsnoteBatchId

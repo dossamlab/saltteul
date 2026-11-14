@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { addDays, weekdayOf } from '../../shared/householdDate'
 import { addMonths, isMonthPlan, monthGrid, monthNumber, monthOf, weekStart, type Ym } from '../../shared/monthPlan'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
-import type { Todo, Ymd } from '../../shared/types'
+import { layoutWeek, occursOn } from '../../shared/todoDays'
+import type { Owner, Todo, Ymd } from '../../shared/types'
 import { MonthPlanCard } from '../components/MonthPlan'
 import { ChoreList, RoutineChecklist } from '../components/RoutineParts'
 import { AddButton, NudgeSheet, sortTodos, TodoRow, TodoSheet } from '../components/TodoParts'
@@ -67,7 +68,7 @@ function WeekStrip({ selected, onSelect }: { selected: Ymd; onSelect: (d: Ymd) =
   return (
     <div className="grid grid-cols-7 gap-1">
       {days.map((d) => {
-        const open = h.todos.filter((x) => x.date === d && !x.done).length
+        const open = h.todos.filter((x) => occursOn(x, d) && !x.done).length
         const active = d === selected
         return (
           <button key={d} type="button" onClick={() => onSelect(d)} aria-pressed={active}
@@ -84,14 +85,26 @@ function WeekStrip({ selected, onSelect }: { selected: Ymd; onSelect: (d: Ymd) =
 
 const WEEK_HEAD = [1, 2, 3, 4, 5, 6, 0]
 const dayTone = (d: Ymd) => (weekdayOf(d) === 0 ? 'text-terra' : weekdayOf(d) === 6 ? 'text-[#5a7fb0]' : 'text-ink')
-const dotTone = (x: Todo) => (x.done ? 'bg-ink-3' : x.source === 'calendar' ? 'bg-wisteria' : 'bg-terra')
-const chipTone = (x: Todo) => (x.done ? 'bg-muted text-ink-3 line-through' : x.source === 'calendar' ? 'bg-lavender/40 text-wisteria' : 'bg-peach-soft text-terra-2')
+const OWNERS: Owner[] = ['wife', 'husband', 'both']
+/** Pastel bar per owner, the same colours as the calendar widget. */
+const OWNER_BAR: Record<Owner, string> = {
+  wife: 'bg-owner-wife text-owner-wife-ink',
+  husband: 'bg-owner-husband text-owner-husband-ink',
+  both: 'bg-owner-both text-owner-both-ink',
+}
+const MAX_LANES = 3
 
-/** Monday-first month. Phone: dots per todo (open, from Google Calendar, done); tablet and PC: up to three titles. */
+/**
+ * Monday-first month, one grid per week: the day buttons fill the columns and the todo bars lie on top of them
+ * (a multi-day todo is one bar from its first to its last day, continued on the next week's row). Up to three bars a
+ * day, then 「+n」; done todos stay, faded. Phone: short bars; tablet and PC (`detailed`): taller bars with times.
+ */
 function MonthGrid({ ym, selected, onSelect, detailed }: { ym: Ym; selected: Ymd; onSelect: (d: Ymd) => void; detailed: boolean }) {
   const h = useHousehold()
-  const byDay = new Map<Ymd, Todo[]>()
-  for (const x of h.todos) if (x.date) byDay.set(x.date, [...(byDay.get(x.date) ?? []), x])
+  const days = monthGrid(ym)
+  const weeks = Array.from({ length: days.length / 7 }, (_, i) => days.slice(i * 7, i * 7 + 7))
+  const dated = sortTodos(h.todos.filter((x) => !!x.date))
+  const rows = detailed ? `32px repeat(${MAX_LANES}, 20px) 18px` : `28px repeat(${MAX_LANES}, 15px) 13px`
   return (
     <div>
       <div className="grid grid-cols-7 pb-1.5">
@@ -99,49 +112,51 @@ function MonthGrid({ ym, selected, onSelect, detailed }: { ym: Ym; selected: Ymd
           <span key={wd} className={`text-center text-[11px] font-semibold ${wd === 0 ? 'text-terra' : wd === 6 ? 'text-[#5a7fb0]' : 'text-ink-3'}`}>{weekdayShort(wd)}</span>
         ))}
       </div>
-      <div className={`grid grid-cols-[repeat(7,minmax(0,1fr))] ${detailed ? 'border-l border-t border-line' : 'gap-0.5'}`}>
-        {monthGrid(ym).map((d) => {
-          const list = sortTodos(byDay.get(d) ?? [])
-          const out = monthOf(d) !== ym
-          const active = d === selected
-          const label = `${formatDay(d)} ${t('todo.countLeft', { n: list.filter((x) => !x.done).length })}`
-          if (detailed) {
-            return (
-              <button key={d} type="button" onClick={() => onSelect(d)} aria-label={label} aria-pressed={active}
-                className={`flex h-[104px] min-w-0 flex-col gap-0.5 border-b border-r border-line p-1.5 text-left ${active ? 'bg-sage-soft' : ''}`}>
-                <span className={`grid h-6 w-6 place-items-center rounded-full text-[13px] font-semibold ${d === h.today ? 'bg-sage text-white' : out ? 'text-ink-3' : dayTone(d)}`}>
-                  {Number(d.slice(8))}
-                </span>
-                {list.slice(0, 3).map((x) => (
-                  <span key={x.id} className={`truncate rounded-md px-1.5 py-px text-[11px] leading-snug ${chipTone(x)}`}>
-                    {x.time ? `${x.time} ` : ''}{x.title}
-                  </span>
-                ))}
-                {list.length > 3 && <span className="pl-1 text-[10px] font-bold text-ink-2">{t('todo.moreInDay', { n: list.length - 3 })}</span>}
-              </button>
-            )
-          }
+      <div className={detailed ? 'border-l border-t border-line' : 'flex flex-col gap-0.5'}>
+        {weeks.map((week) => {
+          const { bars, more } = layoutWeek(dated, week[0], MAX_LANES)
           return (
-            <button key={d} type="button" onClick={() => onSelect(d)} aria-label={label} aria-pressed={active}
-              className={`flex h-[52px] min-w-0 flex-col items-center gap-1 rounded-xl pt-1.5 ${active ? 'bg-sage' : ''}`}>
-              <span className={`grid h-[22px] w-[26px] place-items-center rounded-full text-[14px] font-semibold ${
-                active ? 'text-white' : d === h.today ? 'bg-sage-soft text-sage' : out ? 'text-ink-3' : dayTone(d)}`}>
-                {Number(d.slice(8))}
-              </span>
-              <span className="flex h-1.5 items-center gap-[3px]">
-                {list.slice(0, 3).map((x) => <i key={x.id} className={`block h-[5px] w-[5px] rounded-full ${active ? 'bg-white' : dotTone(x)}`} />)}
-                {list.length > 3 && <em className={`text-[9px] font-bold not-italic ${active ? 'text-white' : 'text-terra-2'}`}>+{list.length - 3}</em>}
-              </span>
-            </button>
+            <div key={week[0]} className="grid grid-cols-[repeat(7,minmax(0,1fr))]" style={{ gridTemplateRows: rows }}>
+              {week.map((d, i) => {
+                const out = monthOf(d) !== ym
+                const active = d === selected
+                const left = dated.filter((x) => occursOn(x, d) && !x.done).length
+                return (
+                  <button key={d} type="button" onClick={() => onSelect(d)} aria-pressed={active}
+                    aria-label={`${formatDay(d)} ${t('todo.countLeft', { n: left })}`}
+                    style={{ gridColumn: i + 1, gridRow: '1 / -1' }}
+                    className={`flex min-w-0 flex-col items-center pt-1 ${detailed ? 'border-b border-r border-line' : 'rounded-xl'} ${active ? 'bg-sage-soft' : ''}`}>
+                    <span className={`grid h-[22px] min-w-[22px] place-items-center rounded-full px-1 text-[13px] font-semibold ${
+                      d === h.today ? 'bg-sage text-white' : out ? 'text-ink-3' : dayTone(d)}`}>
+                      {Number(d.slice(8))}
+                    </span>
+                  </button>
+                )
+              })}
+              {bars.map((b) => (
+                <span key={b.todo.id} aria-hidden
+                  style={{ gridColumn: `${b.col + 1} / span ${b.span}`, gridRow: b.lane + 2 }}
+                  className={`pointer-events-none z-[1] my-px flex min-w-0 items-center overflow-hidden px-1 font-semibold leading-none ${
+                    detailed ? 'text-[11px]' : 'text-[10px]'} ${OWNER_BAR[b.todo.owner] ?? OWNER_BAR.both} ${b.todo.done ? 'opacity-40' : ''} ${
+                    b.fromBefore ? 'ml-0 rounded-l-none' : 'ml-[2px] rounded-l-[4px]'} ${b.toAfter ? 'mr-0 rounded-r-none' : 'mr-[2px] rounded-r-[4px]'}`}>
+                  <span className="truncate">{detailed && b.todo.time && !b.fromBefore ? `${b.todo.time} ` : ''}{b.todo.title}</span>
+                </span>
+              ))}
+              {more.map((n, i) => n > 0 && (
+                <span key={`more${i}`} aria-hidden style={{ gridColumn: i + 1, gridRow: MAX_LANES + 2 }}
+                  className="pointer-events-none z-[1] self-center text-center text-[9px] font-bold leading-none text-ink-2">
+                  {t(detailed ? 'todo.moreInDay' : 'todo.moreShort', { n })}
+                </span>
+              ))}
+            </div>
           )
         })}
       </div>
-      {!detailed && (
-        <div className="mt-2 flex gap-3 text-[12px] text-ink-2">
-          <span className="flex items-center gap-1"><i className="block h-[7px] w-[7px] rounded-full bg-terra" />{t('todo.legendOpen')}</span>
-          <span className="flex items-center gap-1"><i className="block h-[7px] w-[7px] rounded-full bg-wisteria" />{t('todo.legendCalendar')}</span>
-        </div>
-      )}
+      <div className="mt-2 flex flex-wrap gap-3 text-[12px] text-ink-2">
+        {OWNERS.map((o) => (
+          <span key={o} className="flex items-center gap-1"><i className={`block h-2 w-3.5 rounded-[3px] ${OWNER_BAR[o]}`} />{h.nameOf(o)}</span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -159,7 +174,7 @@ export function TodayTodos({ detailed = false, wide = false }: { detailed?: bool
   const [sheet, setSheet] = useState<{ todo: Todo | null } | null>(null)
   const setEditing = (todo: Todo) => setSheet({ todo })
   const [nudge, setNudge] = useState<Todo | null>(null)
-  const dated = sortTodos(h.todos.filter((x) => x.date === day))
+  const dated = sortTodos(h.todos.filter((x) => occursOn(x, day)))
   const undated = sortTodos(h.todos.filter((x) => !x.date && !isMonthPlan(x) && (!x.done || (x.doneAt ?? 0) > Date.now() - 86_400_000)))
 
   const changeView = (v: TodoView) => {

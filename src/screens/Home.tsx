@@ -4,6 +4,7 @@ import { choreStatus } from '../../shared/chores'
 import { monthNumber, monthOf, openPlansNow } from '../../shared/monthPlan'
 import { homeTrips, progress } from '../../shared/packing'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
+import { occursOn, todoLastDay } from '../../shared/todoDays'
 import type { Todo } from '../../shared/types'
 import { AnniversaryCard, AnniversaryStrip, BriefingCard, DinnerCard, KidsnoteCard, WeatherCard } from '../components/HomeCards'
 import { ChoreList, RoutineChecklist } from '../components/RoutineParts'
@@ -47,7 +48,7 @@ function TodayCard({ go, limit, className }: { go: Go; limit?: number; className
   const h = useHousehold()
   const [editing, setEditing] = useState<Todo | null>(null)
   const [nudge, setNudge] = useState<Todo | null>(null)
-  const list = sortTodos(h.todos.filter((x) => x.date === h.today))
+  const list = sortTodos(h.todos.filter((x) => occursOn(x, h.today)))
   const shown = limit ? list.filter((x) => !x.done).slice(0, limit) : list
   const left = list.filter((x) => !x.done).length
   return (
@@ -145,7 +146,7 @@ function TodayAllCard({ go }: { go: Go }) {
   const h = useHousehold()
   const [editing, setEditing] = useState<Todo | null>(null)
   const [nudge, setNudge] = useState<Todo | null>(null)
-  const todos = h.todos.filter((x) => x.date === h.today)
+  const todos = h.todos.filter((x) => occursOn(x, h.today))
   const openTodos = sortTodos(todos.filter((x) => !x.done)).slice(0, 4)
   const routines = routinesForDay(h.routines, h.today)
   const routinesDone = routines.filter((r) => isRoutineDone(h.routineLogs, r.id, h.today)).length
@@ -190,7 +191,7 @@ function TodayAllCard({ go }: { go: Go }) {
 /** Phone home: one line about the child (upcoming Kids Note events, today's lunch) that opens the child tab. */
 function KidsLine({ go }: { go: Go }) {
   const h = useHousehold()
-  const events = h.todos.filter((x) => x.source === 'kidsnote' && x.date && x.date >= h.today && !x.done).length
+  const events = h.todos.filter((x) => x.source === 'kidsnote' && (todoLastDay(x) ?? '') >= h.today && !x.done).length
   const lunch = h.todayMenu?.lunch?.join(', ')
   return (
     <button type="button" onClick={() => go('kids')}
