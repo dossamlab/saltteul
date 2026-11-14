@@ -1,5 +1,5 @@
 import { ArrowLeft, Baby, Bell, CheckSquare, Home, House, Settings2, ShoppingBasket } from 'lucide-react'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { togetherDays } from '../shared/anniversaries'
 import { QuickCapture } from './components/QuickCapture'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -7,6 +7,7 @@ import { IconButton } from './components/ui'
 import { t } from './copy'
 import { useHousehold } from './data/store'
 import { formatDay } from './format'
+import { captureDone, openBus, type OpenTarget } from './native/open'
 import { DesktopHome, HomeScreen, TabletHome, type Go } from './screens/Home'
 import { InboxScreen } from './screens/Inbox'
 import { KidsScreen } from './screens/Kids'
@@ -14,7 +15,7 @@ import { OurHomeScreen } from './screens/OurHome'
 import { PackingBaseScreen } from './screens/PackingBase'
 import { SettingsScreen } from './screens/Settings'
 import { ShoppingScreen } from './screens/Shopping'
-import { TodosScreen, type TodoSection } from './screens/Todos'
+import { TodosScreen, writeTodoView, type TodoSection } from './screens/Todos'
 import { TripScreen } from './screens/Trip'
 import { useLayout } from './useLayout'
 
@@ -110,6 +111,10 @@ export function Shell() {
   const unread = h.nudges.filter((n) => !n.read).length
   const together = h.anniversaries.find((a) => a.kind === 'together')
   const pc = layout === 'pc'
+  /** Quick add opened from a widget (n changes per open so a second tap starts afresh). */
+  const [capture, setCapture] = useState<{ mic: boolean; n: number } | null>(null)
+  /** Bumped when a widget opens the todo screen, so it starts again on today (and in the month view if asked). */
+  const [todosKey, setTodosKey] = useState(0)
 
   useEffect(() => { document.title = t('app.name') }, [])
 
@@ -136,6 +141,30 @@ export function Shell() {
     window.scrollTo({ top: 0 })
   }, [backTo])
   const openTrip = (id: string) => openOverlay(`trip:${id}`)
+
+  // A widget tap (window.saltteulOpen from the Android app), possibly made before this screen existed.
+  const onOpen = useRef<(target: OpenTarget) => void>(() => {})
+  onOpen.current = (target) => {
+    if (target === 'capture' || target === 'capture-mic') {
+      setCapture((c) => ({ mic: target === 'capture-mic', n: (c?.n ?? 0) + 1 }))
+    } else if (target.startsWith('trip:')) {
+      setBackTo(null)
+      setOverlay(target as `trip:${string}`)
+      window.scrollTo({ top: 0 })
+    } else if (target === 'shopping') {
+      go('shopping')
+    } else {
+      if (target === 'todos-month') writeTodoView('month')
+      setTodosKey((k) => k + 1)
+      go('todos', 'today')
+    }
+  }
+  useEffect(() => openBus.subscribe((target) => onOpen.current(target)), [])
+  const finishCapture = useCallback(() => {
+    setCapture(null)
+    captureDone()
+  }, [])
+  const launcher = capture && <QuickCapture key={capture.n} variant="launch" mic={capture.mic} onDone={finishCapture} />
   const tripId = overlay?.startsWith('trip:') ? overlay.slice(5) : null
   const overlayTitle = tripId ? h.trips.find((x) => x.id === tripId)?.name ?? '' : overlay ? t(`${overlay}.title`) : ''
 
@@ -166,7 +195,7 @@ export function Shell() {
   else {
     body =
       tab === 'home' ? (pc ? <DesktopHome go={go} openTrip={openTrip} /> : layout === 'tablet' ? <TabletHome go={go} openTrip={openTrip} /> : <HomeScreen go={go} openTrip={openTrip} />)
-      : tab === 'todos' ? <TodosScreen section={section} onSection={setSection} wide={pc} detailed={layout !== 'phone'} />
+      : tab === 'todos' ? <TodosScreen key={todosKey} section={section} onSection={setSection} wide={pc} detailed={layout !== 'phone'} />
       : tab === 'shopping' ? <ShoppingScreen wide={pc} />
       : tab === 'kids' ? <KidsScreen wide={pc} />
       : <OurHomeScreen openSettings={() => openOverlay('settings')} openTrip={openTrip} openPacking={() => openOverlay('packing')} wide={pc} />
@@ -202,6 +231,7 @@ export function Shell() {
           </header>
           <main className="px-8 pb-12 pt-1">{body}</main>
         </div>
+        {launcher}
       </div>
     )
   }
@@ -236,6 +266,7 @@ export function Shell() {
           {header}
           <main className="mx-auto max-w-[1400px] px-6 pb-10"><UpdateBanner />{body}</main>
         </div>
+        {launcher}
       </div>
     )
   }
@@ -249,6 +280,7 @@ export function Shell() {
         {body}
       </main>
       {!overlay && !inlineQuick && <QuickCapture variant="fab" />}
+      {launcher}
       {!overlay && (
         <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-xl grid-cols-5">
