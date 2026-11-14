@@ -212,7 +212,7 @@ public class WidgetListService extends RemoteViewsService {
 
         private String subtitle(WidgetLogic.Row r, boolean withOwner) {
             StringBuilder b = new StringBuilder();
-            if (r.date != null && day != null && !r.date.equals(day) && WidgetLogic.isYmd(r.date)) {
+            if (r.date != null && day != null && WidgetLogic.isYmd(r.date) && !WidgetLogic.occursOn(r.date, r.endDate, day)) {
                 b.append(WidgetRenderer.relativeDayLabel(c, r.date, day));
             }
             if (r.time != null && !r.time.isEmpty()) {

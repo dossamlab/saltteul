@@ -626,4 +626,96 @@ public class WidgetLogicTest {
         assertNull(Snapshot.fromJson(""));
         assertNull(Snapshot.fromJson("{not json"));
     }
+
+    // ---------- multi-day todos (design 2026-11-14 section 5) ----------
+
+    private static Snapshot.Todo span(String id, String date, String endDate) {
+        Snapshot.Todo t = new Snapshot.Todo(id, id, date, null, "husband", "manual");
+        t.endDate = endDate;
+        return t;
+    }
+
+    @Test
+    public void multiDay_endOfIgnoresAbsentEarlierOrSameEndDate() {
+        assertEquals("2026-11-20", WidgetLogic.endOf("2026-11-18", "2026-11-20"));
+        assertEquals("2026-11-18", WidgetLogic.endOf("2026-11-18", null));
+        assertEquals("2026-11-18", WidgetLogic.endOf("2026-11-18", "2026-11-18"));
+        assertEquals("2026-11-18", WidgetLogic.endOf("2026-11-18", "2026-11-10"));
+        assertEquals("2026-11-18", WidgetLogic.endOf("2026-11-18", "soon"));
+        assertNull(WidgetLogic.endOf(null, "2026-11-20"));
+    }
+
+    @Test
+    public void multiDay_occursOnEveryDayOfItsRange() {
+        Snapshot.Todo trip = span("trip", "2026-11-18", "2026-11-20");
+        assertFalse(WidgetLogic.occursOn(trip, "2026-11-17"));
+        assertTrue(WidgetLogic.occursOn(trip, "2026-11-18"));
+        assertTrue(WidgetLogic.occursOn(trip, "2026-11-19"));
+        assertTrue(WidgetLogic.occursOn(trip, "2026-11-20"));
+        assertFalse(WidgetLogic.occursOn(trip, "2026-11-21"));
+        // Across a month end.
+        Snapshot.Todo month = span("m", "2026-11-29", "2026-12-02");
+        assertTrue(WidgetLogic.occursOn(month, "2026-12-01"));
+    }
+
+    @Test
+    public void multiDay_isTodaysTodoOnTheMiddleDayInEveryWidget() {
+        Snapshot s = new Snapshot();
+        s.todos.add(span("trip", "2026-11-18", "2026-11-20"));
+        s.todos.add(new Snapshot.Todo("one", "one", "2026-11-19", "09:00", "wife", "manual"));
+        assertEquals(2, WidgetLogic.openTodayTodos(s, "2026-11-19").size());
+        assertEquals(1, WidgetLogic.openTodayTodos(s, "2026-11-20").size());
+        assertEquals(0, WidgetLogic.openTodayTodos(s, "2026-11-21").size());
+        assertEquals(2, WidgetLogic.todoWidgetLeft(s, "2026-11-19"));
+        assertEquals("trip,one", rowIds(WidgetLogic.buildRows(s, WidgetLogic.KIND_DASHBOARD, "2026-11-19")));
+        // A done multi-day todo (the calendar reads done ones too) is not on any list.
+        s.todos.get(0).done = true;
+        assertEquals(1, WidgetLogic.openTodayTodos(s, "2026-11-19").size());
+    }
+
+    @Test
+    public void multiDay_kidsnoteStillRunningCountsAsUpcoming() {
+        Snapshot s = new Snapshot();
+        Snapshot.Todo camp = span("camp", "2026-11-17", "2026-11-21");
+        camp.source = "kidsnote";
+        s.todos.add(camp);
+        assertEquals(1, WidgetLogic.upcomingKidsnote(s, "2026-11-20", 3).size());
+        assertEquals(0, WidgetLogic.upcomingKidsnote(s, "2026-11-22", 3).size());
+        // On the tablet board it shows once: under today on the left, not again in the right column.
+        List<String> all = keys(WidgetLogic.tabletRows(s, "2026-11-19", WidgetLogic.COLUMN_ALL, null));
+        assertEquals(1, java.util.Collections.frequency(all, "camp"));
+        assertFalse(keys(WidgetLogic.tabletRows(s, "2026-11-19", WidgetLogic.COLUMN_RIGHT, null)).contains("camp"));
+    }
+
+    @Test
+    public void snapshot_newFieldsRoundTripAndOldCacheReadsWithout() {
+        Snapshot s = new Snapshot();
+        Snapshot.Todo t = span("trip", "2026-11-18", "2026-11-20");
+        t.endTime = "17:00";
+        t.prepItems.add("indoor shoes");
+        t.prepItems.add("milk carton");
+        t.done = true;
+        s.todos.add(t);
+        Snapshot.Weather w = new Snapshot.Weather("2026-11-14", 3.0, 12.0, 60.0);
+        w.sky = "rain";
+        s.weather.add(w);
+        s.trips.add(new Snapshot.Trip("tr1", "beach", "2026-11-17", 2, 5L, 18, 42));
+        Snapshot r = Snapshot.fromJson(s.toJson());
+        assertNotNull(r);
+        assertEquals("2026-11-20", r.todos.get(0).endDate);
+        assertEquals("17:00", r.todos.get(0).endTime);
+        assertEquals(Arrays.asList("indoor shoes", "milk carton"), r.todos.get(0).prepItems);
+        assertTrue(r.todos.get(0).done);
+        assertEquals("rain", r.weather.get(0).sky);
+        assertEquals(42, r.trips.get(0).total);
+        assertEquals(18, r.trips.get(0).packed);
+        assertEquals(2, r.trips.get(0).nights);
+        assertEquals(s.toJson(), r.toJson());
+
+        Snapshot old = Snapshot.fromJson("{\"v\":1,\"status\":\"ok\",\"todos\":[{\"id\":\"a\",\"date\":\"2026-11-14\"}]}");
+        assertNotNull(old);
+        assertNull(old.todos.get(0).endDate);
+        assertTrue(old.todos.get(0).prepItems.isEmpty());
+        assertTrue(old.trips.isEmpty());
+    }
 }

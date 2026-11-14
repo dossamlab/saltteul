@@ -22,7 +22,10 @@ public final class Snapshot {
     public String status = STATUS_OK;
     public long fetchedAt;
     public String uid;
-    /** Open (not done) dated todos. */
+    /**
+     * Dated todos: every open one, plus done ones in the month calendar's range (the calendar shows them faded).
+     * Lists that show only open todos filter on done.
+     */
     public final List<Todo> todos = new ArrayList<>();
     /** Open (not bought) shopping items. */
     public final List<Shop> shopping = new ArrayList<>();
@@ -33,6 +36,8 @@ public final class Snapshot {
     public final List<Weather> weather = new ArrayList<>();
     /** Every pantry item (households/home/pantry). */
     public final List<Pantry> pantry = new ArrayList<>();
+    /** Trips from a week before they start through the return day, with their packing counts. */
+    public final List<Trip> trips = new ArrayList<>();
     public String headline;
     /** role ('husband'|'wife') to display name. */
     public final Map<String, String> memberNames = new HashMap<>();
@@ -46,6 +51,12 @@ public final class Snapshot {
 
     public static final class Todo {
         public String id, title, date, time, owner, source;
+        /** Last day ('YYYY-MM-DD', inclusive) of a multi-day todo; null for a one-day todo. Only meaningful after date. */
+        public String endDate;
+        /** 'HH:mm' on the last day; display only. */
+        public String endTime;
+        /** Names of the things to bring (Todo.prepItems on the web). */
+        public final List<String> prepItems = new ArrayList<>();
         public boolean done;
 
         public Todo() {}
@@ -112,6 +123,8 @@ public final class Snapshot {
     public static final class Weather {
         public String day;
         public Double minC, maxC, popMax;
+        /** WeatherDay.sky: clear, partly, cloudy, rain, snow, rainsnow, shower, or null. */
+        public String sky;
 
         public Weather() {}
 
@@ -142,6 +155,28 @@ public final class Snapshot {
         }
     }
 
+    /** One trip (households/home/trips) with its packed / shown item counts (shared/packing.ts progress). */
+    public static final class Trip {
+        public String id, name;
+        /** First day, 'YYYY-MM-DD'. */
+        public String start;
+        public int nights;
+        public long createdAt;
+        public int packed, total;
+
+        public Trip() {}
+
+        public Trip(String id, String name, String start, int nights, long createdAt, int packed, int total) {
+            this.id = id;
+            this.name = name;
+            this.start = start;
+            this.nights = nights;
+            this.createdAt = createdAt;
+            this.packed = packed;
+            this.total = total;
+        }
+    }
+
     // ---------- JSON ----------
 
     public String toJson() {
@@ -161,6 +196,13 @@ public final class Snapshot {
                 put(j, "time", t.time);
                 put(j, "owner", t.owner);
                 put(j, "source", t.source);
+                put(j, "endDate", t.endDate);
+                put(j, "endTime", t.endTime);
+                if (!t.prepItems.isEmpty()) {
+                    JSONArray p = new JSONArray();
+                    for (String name : t.prepItems) p.put(name);
+                    j.put("prepItems", p);
+                }
                 j.put("done", t.done);
                 a.put(j);
             }
@@ -213,6 +255,7 @@ public final class Snapshot {
                 putNum(j, "minC", w.minC);
                 putNum(j, "maxC", w.maxC);
                 putNum(j, "popMax", w.popMax);
+                put(j, "sky", w.sky);
                 a.put(j);
             }
             o.put("weather", a);
@@ -228,6 +271,19 @@ public final class Snapshot {
                 a.put(j);
             }
             o.put("pantry", a);
+            a = new JSONArray();
+            for (Trip t : trips) {
+                JSONObject j = new JSONObject();
+                put(j, "id", t.id);
+                put(j, "name", t.name);
+                put(j, "start", t.start);
+                j.put("nights", t.nights);
+                j.put("createdAt", t.createdAt);
+                j.put("packed", t.packed);
+                j.put("total", t.total);
+                a.put(j);
+            }
+            o.put("trips", a);
             JSONObject m = new JSONObject();
             for (Map.Entry<String, String> e : memberNames.entrySet()) m.put(e.getKey(), e.getValue());
             o.put("memberNames", m);
@@ -252,6 +308,13 @@ public final class Snapshot {
             for (int i = 0; a != null && i < a.length(); i++) {
                 JSONObject j = a.getJSONObject(i);
                 Todo t = new Todo(str(j, "id"), str(j, "title"), str(j, "date"), str(j, "time"), str(j, "owner"), str(j, "source"));
+                t.endDate = str(j, "endDate");
+                t.endTime = str(j, "endTime");
+                JSONArray p = j.optJSONArray("prepItems");
+                for (int k = 0; p != null && k < p.length(); k++) {
+                    String name = p.optString(k, null);
+                    if (name != null) t.prepItems.add(name);
+                }
                 t.done = j.optBoolean("done", false);
                 s.todos.add(t);
             }
@@ -285,7 +348,9 @@ public final class Snapshot {
             a = o.optJSONArray("weather");
             for (int i = 0; a != null && i < a.length(); i++) {
                 JSONObject j = a.getJSONObject(i);
-                s.weather.add(new Weather(str(j, "day"), num(j, "minC"), num(j, "maxC"), num(j, "popMax")));
+                Weather w = new Weather(str(j, "day"), num(j, "minC"), num(j, "maxC"), num(j, "popMax"));
+                w.sky = str(j, "sky");
+                s.weather.add(w);
             }
             // Caches written before the pantry existed have no "pantry" key: empty list.
             a = o.optJSONArray("pantry");
@@ -293,6 +358,13 @@ public final class Snapshot {
                 JSONObject j = a.getJSONObject(i);
                 s.pantry.add(new Pantry(str(j, "id"), str(j, "name"), str(j, "unit"), j.optInt("qty", 0),
                         j.optDouble("minQty", 0), str(j, "expiry")));
+            }
+            // Caches written before trips were read have no "trips" key: empty list.
+            a = o.optJSONArray("trips");
+            for (int i = 0; a != null && i < a.length(); i++) {
+                JSONObject j = a.getJSONObject(i);
+                s.trips.add(new Trip(str(j, "id"), str(j, "name"), str(j, "start"), j.optInt("nights", 0),
+                        j.optLong("createdAt", 0), j.optInt("packed", 0), j.optInt("total", 0)));
             }
             JSONObject m = o.optJSONObject("memberNames");
             if (m != null) {

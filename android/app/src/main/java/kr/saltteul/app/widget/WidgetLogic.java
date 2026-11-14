@@ -22,6 +22,10 @@ public final class WidgetLogic {
     public static final String KIND_DASHBOARD = "dashboard";
     public static final String KIND_TODO = "todo";
     public static final String KIND_TABLET = "tablet";
+    /** Month calendar 4x4, weather + 챙길 것 4x1 and the quick-add bar 4x1 (design 2026-11-14); no list rows. */
+    public static final String KIND_CALENDAR = "calendar";
+    public static final String KIND_ESSENTIALS = "essentials";
+    public static final String KIND_QUICK_ADD = "quickAdd";
 
     public static final String TARGET_TODO = "todo";
     public static final String TARGET_ROUTINE = "routine";
@@ -377,6 +381,8 @@ public final class WidgetLogic {
         public String title;
         public boolean checked;
         public String date;
+        /** Last day of a multi-day todo (null for one day), so the subtitle leaves out the date on every day it runs. */
+        public String endDate;
         public String time;
         public String owner;
         /** Todo source ('kidsnote', 'calendar', ...). */
@@ -470,6 +476,7 @@ public final class WidgetLogic {
             r.id = t.id;
             r.title = t.title;
             r.date = t.date;
+            r.endDate = t.endDate;
             r.time = t.time;
             r.owner = t.owner;
             r.source = t.source;
@@ -525,14 +532,39 @@ public final class WidgetLogic {
         }
     };
 
-    private static String nz(String s) {
+    static String nz(String s) {
         return s == null ? "" : s;
     }
 
-    /** Open todos dated today, by time. */
+    // ---------- multi-day todos (design 2026-11-14 section 5) ----------
+
+    /**
+     * Last day of a todo: endDate when it is a valid date after date, else date itself (endDate is absent on older
+     * todos, and one on or before the start is ignored). Null when date is not a valid date.
+     */
+    public static String endOf(String date, String endDate) {
+        if (!isYmd(date)) return null;
+        return isYmd(endDate) && diffDays(date, endDate) > 0 ? endDate.substring(0, 10) : date.substring(0, 10);
+    }
+
+    public static String endOf(Snapshot.Todo t) {
+        return endOf(t.date, t.endDate);
+    }
+
+    /** A todo counts as that day's todo on every day from date through its last day. */
+    public static boolean occursOn(String date, String endDate, String day) {
+        String end = endOf(date, endDate);
+        return end != null && diffDays(date, day) >= 0 && diffDays(day, end) >= 0;
+    }
+
+    public static boolean occursOn(Snapshot.Todo t, String day) {
+        return occursOn(t.date, t.endDate, day);
+    }
+
+    /** Open todos that occur today (multi-day ones on every day of their range), by time. */
     public static List<Snapshot.Todo> openTodayTodos(Snapshot s, String day) {
         List<Snapshot.Todo> out = new ArrayList<>();
-        for (Snapshot.Todo t : s.todos) if (!t.done && day.equals(t.date)) out.add(t);
+        for (Snapshot.Todo t : s.todos) if (!t.done && occursOn(t, day)) out.add(t);
         Collections.sort(out, BY_DATE_TIME);
         return out;
     }
@@ -551,12 +583,12 @@ public final class WidgetLogic {
         return t;
     }
 
-    /** Open kidsnote todos dated on or after day, soonest first. */
+    /** Open kidsnote todos that occur on day or later (a multi-day one still running counts), soonest first. */
     public static List<Snapshot.Todo> upcomingKidsnote(Snapshot s, String day, int limit) {
         List<Snapshot.Todo> out = new ArrayList<>();
         for (Snapshot.Todo t : s.todos) {
             if (t.done || !"kidsnote".equals(t.source) || !isYmd(t.date)) continue;
-            if (diffDays(day, t.date) >= 0) out.add(t);
+            if (diffDays(day, endOf(t)) >= 0) out.add(t);
         }
         Collections.sort(out, BY_DATE_TIME);
         return out.size() > limit ? new ArrayList<>(out.subList(0, limit)) : out;
@@ -657,7 +689,11 @@ public final class WidgetLogic {
             }
         }
         if (right) {
-            List<Snapshot.Todo> kids = upcomingKidsnote(s, addDays(day, 1), TABLET_KIDSNOTE);
+            // A multi-day one that runs today is already on the left.
+            List<Snapshot.Todo> kids = new ArrayList<>();
+            for (Snapshot.Todo t : upcomingKidsnote(s, addDays(day, 1), Integer.MAX_VALUE)) {
+                if (kids.size() < TABLET_KIDSNOTE && !occursOn(t, day)) kids.add(t);
+            }
             if (!kids.isEmpty()) {
                 rows.add(Row.section(SECTION_KIDSNOTE));
                 for (Snapshot.Todo t : kids) rows.add(Row.todo(t));
