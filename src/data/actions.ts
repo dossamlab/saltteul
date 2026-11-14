@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions'
 import { defaultBase, itemsFromBase, recount, streakUpdates, type ReviewProposal } from '../../shared/packing'
 import { applyPantryOp } from '../../shared/pantry'
 import { routineLogId } from '../../shared/routines'
+import { normalizeRange } from '../../shared/todoDays'
 import type {
   Anniversary, Chore, Consumable, MenuExtractResult, MonthlyMenu, Nudge, Owner, PackingBaseItem, PantryItem, PantryLog, PantryOp, PrepRule,
   QuickAddResult, Routine, Settings, ShoppingItem, Todo, Trip, TripItem, Ymd,
@@ -19,11 +20,14 @@ function clean<T extends object>(o: T): T {
 }
 
 // Todos
-export type TodoDraft = Pick<Todo, 'title' | 'owner'> & Partial<Pick<Todo, 'note' | 'date' | 'time' | 'prepItems' | 'month'>>
+export type TodoDraft = Pick<Todo, 'title' | 'owner'> & Partial<Pick<Todo, 'note' | 'date' | 'time' | 'prepItems' | 'month' | 'endDate' | 'endTime'>>
 
 export function addTodo(hid: string, d: TodoDraft) {
+  // A range is stored only when it is valid; a one-day todo has no end fields at all.
+  const end = normalizeRange({ date: d.date || null, time: d.time || null, endDate: d.endDate, endTime: d.endTime })
   return addDoc(col(hid, 'todos'), clean({
     title: d.title.trim(), owner: d.owner, note: d.note?.trim() || undefined, date: d.date || null, time: d.time || null,
+    endDate: end.endDate ?? undefined, endTime: end.endTime ?? undefined,
     // A month plan only while there is no date.
     month: !d.date && d.month ? d.month : undefined,
     prepItems: d.prepItems?.length ? d.prepItems : undefined,

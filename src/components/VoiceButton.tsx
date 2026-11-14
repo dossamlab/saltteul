@@ -16,10 +16,12 @@ function voiceMessage(e: unknown): string {
  * fills the field; the user still presses 「정리」. `heard` comes along when Claude corrected what Speech-to-Text heard.
  * Hidden where the browser cannot record.
  */
-export function VoiceButton({ onText, onStatus, onStart, size = 'md' }: {
+export function VoiceButton({ onText, onStatus, onStart, size = 'md', autoStart = false }: {
   onText: (text: string, heard?: string) => void
   /** Called when a new recording starts. */
   onStart?: () => void
+  /** Start recording as soon as the button appears (quick add opened from the widget's microphone). */
+  autoStart?: boolean
   /** Short status line for the caller to show ('' clears it). */
   onStatus: (text: string, tone: 'info' | 'error') => void
   size?: 'sm' | 'md'
@@ -29,11 +31,22 @@ export function VoiceButton({ onText, onStatus, onStart, size = 'md' }: {
   const rec = useRef<Recording | null>(null)
   const alive = useRef(true)
   const supported = useRef(voiceSupported()).current
+  const startRef = useRef<(() => Promise<void>) | null>(null)
+  const autoPending = useRef(autoStart)
 
-  useEffect(() => () => {
-    alive.current = false
-    rec.current?.cancel()
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+      rec.current?.cancel()
+    }
   }, [])
+
+  useEffect(() => {
+    if (!autoPending.current || !supported) return
+    autoPending.current = false
+    void startRef.current?.()
+  }, [supported])
 
   if (!supported) return null
 
@@ -78,6 +91,8 @@ export function VoiceButton({ onText, onStatus, onStart, size = 'md' }: {
       onStatus(voiceMessage(e), 'error')
     }
   }
+
+  startRef.current = start
 
   const box = size === 'sm' ? 'h-9 w-9' : 'h-11 w-11'
   const recording = state === 'recording'

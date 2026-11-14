@@ -618,6 +618,14 @@
     {"key": "trip.tab.kid", "where": "여행 짐 탭 이름. 서버 저녁 브리핑에서도 씀", "meaning": "아이", "fixed": "아이"},
     {"key": "trip.tab.wife", "where": "여행 짐 탭 이름. 서버 저녁 브리핑에서도 씀", "meaning": "엄마", "fixed": "엄마"},
     {"key": "trip.tab.husband", "where": "여행 짐 탭 이름. 서버 저녁 브리핑에서도 씀", "meaning": "아빠", "fixed": "아빠"},
-    {"key": "trip.tab.both", "where": "여행 짐 탭 이름. 서버 저녁 브리핑에서도 씀", "meaning": "가족이 함께 쓰는 짐", "fixed": "함께"}
+    {"key": "trip.tab.both", "where": "여행 짐 탭 이름. 서버 저녁 브리핑에서도 씀", "meaning": "가족이 함께 쓰는 짐", "fixed": "함께"},
+    {"key": "date.mdw", "where": "여러 날 할 일 기간의 시작(확인 목록, 할 일 줄)", "meaning": "{m}월 {d}일({w}요일)", "fixed": "{m}월 {d}일({w})", "vars": ["m", "d", "w"]},
+    {"key": "date.dw", "where": "여러 날 할 일 기간의 끝(시작과 같은 달)", "meaning": "{d}일({w}요일)", "fixed": "{d}일({w})", "vars": ["d", "w"]},
+    {"key": "date.range", "where": "기간과 시각 범위를 잇는 표시(예: 11월 18일(화)~20일(목))", "meaning": "{from}부터 {to}까지", "fixed": "{from}~{to}", "vars": ["from", "to"]},
+    {"key": "field.startDate", "where": "간편입력 확인 목록에서 고치는 칸의 라벨", "meaning": "일정이 시작하는 날", "fixed": "시작하는 날"},
+    {"key": "field.endDate", "where": "간편입력 확인 목록과 할 일 수정 창의 칸 라벨", "meaning": "여러 날 일정이 끝나는 날(그날 포함)", "fixed": "끝나는 날"},
+    {"key": "quick.editItem", "where": "간편입력 확인 목록에서 날짜와 담당을 누르면 고치는 버튼의 설명(화면 낭독용)", "meaning": "날짜와 담당 고치기", "fixed": "날짜와 담당 고치기"},
+    {"key": "quick.editDone", "where": "간편입력 확인 목록에서 날짜와 담당을 다 고친 뒤 접는 버튼", "meaning": "고치기를 마침", "fixed": "완료"},
+    {"key": "todo.moreShort", "where": "휴대폰 월간 달력 칸에 다 못 보여 준 일정 수", "meaning": "{n}개 더 있다", "fixed": "+{n}", "vars": ["n"]}
   ]
 }

@@ -1,17 +1,18 @@
-import { ArrowUp, Camera, Loader2, Plus, Sparkles } from 'lucide-react'
+import { ArrowUp, Camera, Loader2, Pencil, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { isRoutineDone } from '../../shared/routines'
-import type { QuickAddResult, QuickItem } from '../../shared/types'
+import { normalizeRange } from '../../shared/todoDays'
+import type { Owner, QuickAddResult, QuickItem } from '../../shared/types'
 import { t } from '../copy'
 import {
   addPantryItem, addShopping, addTodo, applyPantryOps, extractFromFile, markChoreDone, quickAdd, toggleRoutine,
 } from '../data/actions'
 import { useHousehold, type HouseholdData } from '../data/store'
 import { prepareUpload, UploadError } from '../data/upload'
-import { relativeDay, timeLabel } from '../format'
+import { rangeLabel, relativeDay, timeRangeLabel } from '../format'
 import { joinVoice, undoVoiceFix, type VoiceFix } from '../voice/fix'
-import { Button, Checkbox, IconButton, OwnerBadge, Pill, Sheet } from './ui'
+import { Button, Checkbox, Field, IconButton, OwnerBadge, OwnerPicker, Pill, Sheet } from './ui'
 import { VoiceButton } from './VoiceButton'
 
 type Phase =
@@ -40,6 +41,7 @@ async function applyItems(h: HouseholdData, items: QuickItem[]): Promise<number>
       case 'todo':
         await addTodo(h.hid, {
           title: it.title, owner: it.owner, date: it.date, time: it.time, note: it.note ?? undefined, prepItems: it.prepItems, month: it.month,
+          endDate: it.endDate, endTime: it.endTime,
         })
         return 1
       case 'shopping':
@@ -74,8 +76,41 @@ function itemLabel(it: QuickItem) {
   return it.kind === 'shopping' || it.kind === 'pantry' || it.kind === 'pantryNew' ? it.name : it.title
 }
 
-function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolean; onToggle: () => void }) {
+type TodoItem = Extract<QuickItem, { kind: 'todo' }>
+
+/** A todo proposal with new dates; an end that no longer fits the start is dropped. */
+function withDates(item: TodoItem, patch: Partial<Pick<TodoItem, 'date' | 'endDate'>>): TodoItem {
+  const date = patch.date !== undefined ? patch.date : item.date
+  const end = normalizeRange({ date, time: item.time, endDate: patch.endDate !== undefined ? patch.endDate : item.endDate, endTime: item.endTime })
+  const next: TodoItem = { ...item, date }
+  delete next.endDate
+  delete next.endTime
+  return { ...next, ...(end.endDate ? { endDate: end.endDate } : {}), ...(end.endTime ? { endTime: end.endTime } : {}) }
+}
+
+/** Start and end dates and the owner of a todo proposal, edited in place before saving. */
+function TodoItemEditor({ item, onChange, onDone }: { item: TodoItem; onChange: (next: TodoItem) => void; onDone: () => void }) {
   const h = useHousehold()
+  const names = { husband: h.nameOf('husband'), wife: h.nameOf('wife'), both: h.nameOf('both') } as Record<Owner, string>
+  return (
+    <div className="mt-2 flex flex-col gap-3 rounded-[var(--radius-field)] bg-muted p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <Field label={t('field.startDate')} type="date" value={item.date ?? ''}
+          onChange={(e) => onChange(withDates(item, { date: e.target.value || null }))} />
+        <Field label={t('field.endDate')} type="date" value={item.endDate ?? ''} min={item.date ?? undefined} disabled={!item.date}
+          onChange={(e) => onChange(withDates(item, { endDate: e.target.value || null }))} />
+      </div>
+      <OwnerPicker value={item.owner} onChange={(owner) => onChange({ ...item, owner })} names={names} />
+      <Button type="button" variant="soft" className="h-10 bg-white" onClick={onDone}>{t('quick.editDone')}</Button>
+    </div>
+  )
+}
+
+function ItemRow({ item, checked, onToggle, onChange }: {
+  item: QuickItem; checked: boolean; onToggle: () => void; onChange: (next: QuickItem) => void
+}) {
+  const h = useHousehold()
+  const [editing, setEditing] = useState(false)
   return (
     <div className={`flex items-start gap-3 py-2.5 ${checked ? '' : 'opacity-50'}`}>
       <div className="pt-0.5"><Checkbox checked={checked} onChange={onToggle} label={itemLabel(item)} /></div>
@@ -87,11 +122,18 @@ function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolea
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2">
           <Pill tone={item.kind === 'shopping' ? 'terra' : item.kind === 'todo' ? 'muted' : item.kind === 'pantry' || item.kind === 'pantryNew' ? 'ai' : 'sage'}>{t(KIND_KEY[item.kind])}</Pill>
           {item.kind === 'todo' && (
-            <>
-              <span>{item.date ? relativeDay(item.date, h.today) : item.month ? t('quick.monthPlan', { m: Number(item.month.slice(5)) }) : t('quick.noDate')}</span>
-              {item.time && <span>{timeLabel(item.time)}</span>}
+            <button type="button" onClick={() => setEditing(!editing)} aria-expanded={editing}
+              className="flex flex-wrap items-center gap-1.5 rounded-md text-left text-ink-2 underline-offset-2 hover:underline">
+              <span className="sr-only">{t('quick.editItem')}</span>
+              <span>
+                {item.date
+                  ? item.endDate ? rangeLabel(item.date, item.endDate) : relativeDay(item.date, h.today)
+                  : item.month ? t('quick.monthPlan', { m: Number(item.month.slice(5)) }) : t('quick.noDate')}
+              </span>
+              {item.time && <span>{timeRangeLabel(item.time, item.endTime)}</span>}
               <OwnerBadge owner={item.owner} name={h.nameOf(item.owner)} />
-            </>
+              <Pencil size={12} aria-hidden className="text-ink-3" />
+            </button>
           )}
           {(item.kind === 'routineDone' || item.kind === 'choreDone') && <span>{t('quick.markDone')}</span>}
           {item.kind === 'pantry' && (
@@ -100,6 +142,7 @@ function ItemRow({ item, checked, onToggle }: { item: QuickItem; checked: boolea
           {item.kind === 'pantryNew' && <span>{t('quick.pantryNew', { qty: `${item.qty}${item.unit}` })}</span>}
           {item.kind === 'shopping' && item.note && <span>{item.note}</span>}
         </div>
+        {item.kind === 'todo' && editing && <TodoItemEditor item={item} onChange={onChange} onDone={() => setEditing(false)} />}
         {item.kind === 'todo' && item.note && <p className="mt-1 text-[13px] text-ink-2">{item.note}</p>}
         {item.kind === 'todo' && !!item.prepItems?.length && (
           <div className="mt-1.5 flex flex-wrap gap-1">
@@ -124,12 +167,16 @@ function Toast({ text }: { text: string }) {
 /**
  * Quick add: one line of text (or a newsletter photo/PDF) -> Claude proposes items -> the user keeps some -> written.
  * variant 'fab' = phone round button that opens the sheet; 'bar' = inline input (tablet and PC header, phone todo and
- * shopping tabs). fallback: when Claude cannot read the line, offer to save it as it is as a todo or a shopping item.
+ * shopping tabs); 'launch' = only the sheet, open at once (a widget opened the app), with `mic` starting a recording,
+ * and `onDone` called after saving or cancelling. fallback: when Claude cannot read the line, offer to save it as it is
+ * as a todo or a shopping item.
  */
-export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fallback?: 'todo' | 'shopping' }) {
+export function QuickCapture({ variant, fallback, mic = false, onDone }: {
+  variant: 'fab' | 'bar' | 'launch'; fallback?: 'todo' | 'shopping'; mic?: boolean; onDone?: () => void
+}) {
   const h = useHousehold()
   const [text, setText] = useState('')
-  const [phase, setPhase] = useState<Phase | null>(null)
+  const [phase, setPhase] = useState<Phase | null>(variant === 'launch' ? { step: 'input' } : null)
   const [toast, setToast] = useState('')
   const [voiceStatus, setVoiceStatus] = useState<{ text: string; tone: 'info' | 'error' }>({ text: '', tone: 'info' })
   const fileRef = useRef<HTMLInputElement>(null)
@@ -177,6 +224,7 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
   const close = () => {
     req.current++
     setPhase(null)
+    if (variant === 'launch') onDone?.()
   }
   const show = (id: number, result: QuickAddResult) => {
     if (id !== req.current) return
@@ -219,6 +267,7 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
       setPhase(null)
       setText('')
       setToast(t('quick.added', { n }))
+      if (variant === 'launch') onDone?.()
     } catch {
       setPhase({ step: 'error', message: t('quick.saveFailed') })
     }
@@ -262,10 +311,10 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
       {phase?.step === 'input' && (
         <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void runText(text) }}>
           <div className="flex items-start gap-2">
-            <textarea value={text} onChange={(e) => typeText(e.target.value)} rows={3} autoFocus
+            <textarea value={text} onChange={(e) => typeText(e.target.value)} rows={3} autoFocus={!mic}
               placeholder={t('quick.placeholder')} aria-label={t('quick.title')}
               className="min-w-0 flex-1 resize-none rounded-[var(--radius-field)] border border-sand bg-white px-3.5 py-3 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-3 focus:border-sage focus:ring-[1.5px] focus:ring-sage" />
-            <VoiceButton onText={appendVoice} onStatus={onVoiceStatus} onStart={() => setVoiceFix(null)} />
+            <VoiceButton onText={appendVoice} onStatus={onVoiceStatus} onStart={() => setVoiceFix(null)} autoStart={mic} />
           </div>
           {voiceNote || <p className="text-[12px] text-ink-2">{t('quick.hint')}</p>}
           <Button type="submit" disabled={!text.trim()}><Sparkles size={18} />{t('quick.submit')}</Button>
@@ -290,7 +339,8 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
           <div className="divide-y divide-line">
             {phase.result.items.map((it, i) => (
               <ItemRow key={i} item={it} checked={phase.keep[i]}
-                onToggle={() => setPhase({ ...phase, keep: phase.keep.map((k, j) => (j === i ? !k : k)) })} />
+                onToggle={() => setPhase({ ...phase, keep: phase.keep.map((k, j) => (j === i ? !k : k)) })}
+                onChange={(next) => setPhase({ ...phase, result: { ...phase.result, items: phase.result.items.map((x, j) => (j === i ? next : x)) } })} />
             ))}
           </div>
           {phase.result.unparsed.length > 0 && (
@@ -314,7 +364,7 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
           <p role="alert" className="rounded-[var(--radius-field)] bg-peach-soft px-3.5 py-3 text-[14px] text-terra-2">{phase.message}</p>
           <div className="flex gap-2">
             <Button variant="soft" className="flex-1" onClick={close}>{t('action.close')}</Button>
-            {variant === 'fab' && <Button className="flex-1" onClick={() => setPhase({ step: 'input' })}>{t('quick.retry')}</Button>}
+            {variant !== 'bar' && <Button className="flex-1" onClick={() => setPhase({ step: 'input' })}>{t('quick.retry')}</Button>}
           </div>
           {fallback && text.trim() && (
             <Button variant="soft" onClick={savePlain}>
@@ -326,6 +376,16 @@ export function QuickCapture({ variant, fallback }: { variant: 'fab' | 'bar'; fa
       )}
     </Sheet>
   )
+
+  if (variant === 'launch') {
+    return (
+      <>
+        {fileInput}
+        {sheet}
+        <Toast text={toast} />
+      </>
+    )
+  }
 
   if (variant === 'fab') {
     return (

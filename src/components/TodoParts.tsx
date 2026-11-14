@@ -1,10 +1,11 @@
 import { BellRing, CalendarCheck2, Plus, School, Sparkles, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { isMultiDay, normalizeRange } from '../../shared/todoDays'
 import type { Owner, Todo } from '../../shared/types'
 import { t } from '../copy'
 import { addTodo, deleteTodo, sendNudge, toggleTodo, updateTodo, type TodoDraft } from '../data/actions'
 import { useHousehold } from '../data/store'
-import { timeLabel } from '../format'
+import { rangeLabel, timeRangeLabel } from '../format'
 import { Button, Checkbox, Field, IconButton, OwnerBadge, OwnerPicker, Pill, Sheet } from './ui'
 
 export function sortTodos(list: Todo[]) {
@@ -31,7 +32,8 @@ export function TodoRow({ todo, onEdit, onNudge, tag }: { todo: Todo; onEdit: (t
       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onEdit(todo)}>
         <p className={`text-[15px] leading-snug ${todo.done ? 'done-text' : 'text-ink'}`}>{todo.title}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2">
-          {todo.time && <span>{timeLabel(todo.time)}</span>}
+          {isMultiDay(todo) && <span>{rangeLabel(todo.date!, todo.endDate!)}</span>}
+          {todo.time && <span>{timeRangeLabel(todo.time, todo.endTime)}</span>}
           {tag && <Pill tone="terra">{tag}</Pill>}
           <OwnerBadge owner={todo.owner} name={h.nameOf(todo.owner)} />
           {todo.source === 'kidsnote' && (
@@ -85,7 +87,13 @@ export function TodoSheet({ open, onClose, todo, defaultDate, month }: {
 
   const save = async () => {
     if (!draft.title.trim()) return
-    if (todo) await updateTodo(h.hid, todo.id, { ...draft, date: draft.date || null, time: draft.time || null, month: draft.date ? null : draft.month ?? null })
+    if (todo) {
+      const date = draft.date || null
+      const time = draft.time || null
+      // An end that no longer fits the new date or time is cleared.
+      const end = normalizeRange({ date, time, endDate: draft.endDate, endTime: draft.endTime })
+      await updateTodo(h.hid, todo.id, { ...draft, date, time, month: date ? null : draft.month ?? null, ...end })
+    }
     else await addTodo(h.hid, draft)
     onClose()
   }
@@ -98,6 +106,10 @@ export function TodoSheet({ open, onClose, todo, defaultDate, month }: {
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('field.date')} type="date" value={draft.date ?? ''} onChange={(e) => setDraft({ ...draft, date: e.target.value || null })} />
           <Field label={t('field.time')} type="time" value={draft.time ?? ''} onChange={(e) => setDraft({ ...draft, time: e.target.value || null })} />
+          {draft.date && (
+            <Field label={t('field.endDate')} type="date" value={draft.endDate ?? ''} min={draft.date}
+              onChange={(e) => setDraft({ ...draft, endDate: e.target.value || null })} />
+          )}
         </div>
         <OwnerPicker value={draft.owner} onChange={(owner) => setDraft({ ...draft, owner })} names={names} />
         <Field label={t('field.note')} value={draft.note ?? ''} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
@@ -123,6 +135,8 @@ function fromTodo(todo: Todo | null | undefined, defaultDate: string | null | un
     note: todo?.note ?? '',
     date: todo ? todo.date ?? null : month ? null : defaultDate ?? null,
     time: todo?.time ?? null,
+    endDate: todo?.endDate ?? null,
+    endTime: todo?.endTime ?? null,
   }
 }
 
