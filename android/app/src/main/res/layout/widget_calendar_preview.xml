@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static picker preview (API 31+): header, weekday row and a few owner bars. Uses only string resources. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="3dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_card_soft"
+        android:orientation="vertical"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:maxLines="1"
+                android:text="@string/widget_calendar_name"
+                android:textColor="@color/widget_ink"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/widget_round_soft"
+                android:scaleType="center"
+                android:src="@drawable/widget_plus" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="18dp"
+            android:orientation="horizontal">
+
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_1" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_2" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_3" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_4" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_5" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_6" android:textColor="#5A7FB0" />
+            <TextView style="@style/WidgetPreviewWeekday" android:text="@string/weekday_0" android:textColor="#E07A5F" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="horizontal">
+
+            <View android:layout_width="0dp" android:layout_height="10dp" android:layout_weight="1" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="10dp"
+                android:layout_weight="3"
+                android:background="@drawable/widget_bar_husband" />
+            <View android:layout_width="0dp" android:layout_height="10dp" android:layout_weight="3" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal">
+
+            <View android:layout_width="0dp" android:layout_height="10dp" android:layout_weight="2" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_bar_wife" />
+            <View android:layout_width="0dp" android:layout_height="10dp" android:layout_weight="4" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp"
+            android:orientation="horizontal">
+
+            <View android:layout_width="0dp" android:layout_height="10dp" android:layout_weight="4" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="10dp"
+                android:layout_weight="2"
+                android:background="@drawable/widget_bar_both" />
+            <View android:layout_width="0dp" android:layout_height="10dp" android:layout_weight="1" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

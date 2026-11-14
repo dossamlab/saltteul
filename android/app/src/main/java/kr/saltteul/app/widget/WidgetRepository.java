@@ -20,6 +20,7 @@ import com.google.firebase.firestore.WriteBatch;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -42,6 +43,8 @@ public final class WidgetRepository {
     private static final String KEY_UNDO_AT = "undoRoutineAt";
     /** The household id is fixed for this two-person app. */
     static final String HOUSEHOLD = "households/home";
+    /** Firestore whereIn takes up to 30 values; a week's window never has nearly this many trips. */
+    private static final int TRIP_IDS_PER_QUERY = 10;
 
     private WidgetRepository() {}
 
@@ -141,9 +144,14 @@ public final class WidgetRepository {
         Task<QuerySnapshot> membersT = home.collection("members").get();
         Task<DocumentSnapshot> settingsT = home.collection("settings").document("main").get();
         Task<QuerySnapshot> pantryT = home.collection("pantry").get();
+        // Month calendar: every todo dated in the range it shows, done ones too (a single-field range, no index).
+        Task<QuerySnapshot> monthT = home.collection("todos")
+                .whereGreaterThanOrEqualTo("date", CalendarLogic.fetchFrom(day))
+                .whereLessThanOrEqualTo("date", CalendarLogic.fetchTo(day)).get();
+        Task<QuerySnapshot> tripsT = home.collection("trips").get();
 
         List<Task<?>> all = Arrays.<Task<?>>asList(todosT, shopT, routinesT, logsT, annT, briefT, membersT, settingsT,
-                pantryT);
+                pantryT, monthT, tripsT);
         Tasks.await(Tasks.whenAllComplete(all), timeoutSec, TimeUnit.SECONDS);
         for (Task<?> t : all) {
             Exception e = t.getException();
@@ -160,13 +168,16 @@ public final class WidgetRepository {
         s.status = Snapshot.STATUS_OK;
         s.fetchedAt = now;
         s.uid = uid;
+        Map<String, Snapshot.Todo> todos = new LinkedHashMap<>();
         for (DocumentSnapshot d : todosT.getResult().getDocuments()) {
-            String date = str(d.get("date"));
-            if (!WidgetLogic.isYmd(date)) continue; // undated todos never show on widgets
-            Snapshot.Todo t = new Snapshot.Todo(d.getId(), str(d.get("title")), date, str(d.get("time")),
-                    str(d.get("owner")), str(d.get("source")));
-            s.todos.add(t);
+            Snapshot.Todo t = todo(d);
+            if (t != null) todos.put(t.id, t);
         }
+        for (DocumentSnapshot d : monthT.getResult().getDocuments()) {
+            Snapshot.Todo t = todo(d);
+            if (t != null && !todos.containsKey(t.id)) todos.put(t.id, t);
+        }
+        s.todos.addAll(todos.values());
         for (DocumentSnapshot d : shopT.getResult().getDocuments()) {
             Double created = num(d.get("createdAt"));
             Snapshot.Shop sh = new Snapshot.Shop(d.getId(), str(d.get("name")), str(d.get("consumableId")),
@@ -203,8 +214,10 @@ public final class WidgetRepository {
                 for (Object o : (List<?>) days) {
                     if (!(o instanceof Map)) continue;
                     Map<?, ?> w = (Map<?, ?>) o;
-                    s.weather.add(new Snapshot.Weather(str(w.get("day")), num(w.get("minC")), num(w.get("maxC")),
-                            num(w.get("popMax"))));
+                    Snapshot.Weather wd = new Snapshot.Weather(str(w.get("day")), num(w.get("minC")),
+                            num(w.get("maxC")), num(w.get("popMax")));
+                    wd.sky = str(w.get("sky"));
+                    s.weather.add(wd);
                 }
             }
         }
@@ -216,7 +229,59 @@ public final class WidgetRepository {
                     qty == null ? 0 : (int) Math.max(0, Math.round(qty)), minQty == null ? 0 : minQty,
                     WidgetLogic.isYmd(expiry) ? expiry : null));
         }
+        readTrips(home, tripsT.getResult(), day, s, timeoutSec);
         return s;
+    }
+
+    /** A dated todo (undated ones never show on widgets), or null. endDate/endTime may be absent on older todos. */
+    private static Snapshot.Todo todo(DocumentSnapshot d) {
+        String date = str(d.get("date"));
+        if (!WidgetLogic.isYmd(date)) return null;
+        Snapshot.Todo t = new Snapshot.Todo(d.getId(), str(d.get("title")), date, str(d.get("time")),
+                str(d.get("owner")), str(d.get("source")));
+        String endDate = str(d.get("endDate"));
+        t.endDate = WidgetLogic.isYmd(endDate) ? endDate : null;
+        t.endTime = str(d.get("endTime"));
+        Boolean done = d.getBoolean("done");
+        t.done = done != null && done;
+        Object prep = d.get("prepItems");
+        if (prep instanceof List) {
+            for (Object o : (List<?>) prep) {
+                Object name = o instanceof Map ? ((Map<?, ?>) o).get("name") : o;
+                if (name instanceof String && !((String) name).trim().isEmpty()) t.prepItems.add(((String) name).trim());
+            }
+        }
+        return t;
+    }
+
+    /**
+     * Trips from a week before they start through the return day, each with packed / shown item counts from
+     * households/home/tripItems (one whereIn on the trip ids; there are only a few such trips at a time).
+     */
+    private static void readTrips(DocumentReference home, QuerySnapshot trips, String day, Snapshot s, long timeoutSec)
+            throws Exception {
+        Map<String, Snapshot.Trip> byId = new LinkedHashMap<>();
+        for (DocumentSnapshot d : trips.getDocuments()) {
+            String start = str(d.get("start"));
+            Double nights = num(d.get("nights"));
+            int n = nights == null ? 0 : (int) Math.max(0, Math.round(nights));
+            if (!EssentialsLogic.tripInWindow(start, n, day)) continue;
+            Double created = num(d.get("createdAt"));
+            byId.put(d.getId(), new Snapshot.Trip(d.getId(), str(d.get("name")), start, n,
+                    created == null ? 0 : created.longValue(), 0, 0));
+            if (byId.size() >= TRIP_IDS_PER_QUERY) break;
+        }
+        if (byId.isEmpty()) return;
+        QuerySnapshot items = Tasks.await(home.collection("tripItems")
+                .whereIn("tripId", new ArrayList<Object>(byId.keySet())).get(), timeoutSec, TimeUnit.SECONDS);
+        for (DocumentSnapshot d : items.getDocuments()) {
+            Snapshot.Trip t = byId.get(str(d.get("tripId")));
+            Double qty = num(d.get("qty"));
+            if (t == null || qty == null || !EssentialsLogic.isShown(qty)) continue;
+            t.total++;
+            if (Boolean.TRUE.equals(d.getBoolean("packed"))) t.packed++;
+        }
+        s.trips.addAll(byId.values());
     }
 
     private static String str(Object v) {

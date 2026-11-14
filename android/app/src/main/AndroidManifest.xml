@@ -72,6 +72,43 @@
                 android:resource="@xml/widget_tablet_info" />
         </receiver>
 
+        <!-- Calendar, weather and quick-add widgets (design 2026-11-14) -->
+        <receiver
+            android:name=".widget.CalendarWidget"
+            android:exported="false"
+            android:label="@string/widget_calendar_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_calendar_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.EssentialsWidget"
+            android:exported="false"
+            android:label="@string/widget_essentials_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_essentials_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickAddWidget"
+            android:exported="false"
+            android:label="@string/widget_quickAdd_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quickadd_info" />
+        </receiver>
+
         <service
             android:name=".widget.WidgetListService"
             android:exported="false"

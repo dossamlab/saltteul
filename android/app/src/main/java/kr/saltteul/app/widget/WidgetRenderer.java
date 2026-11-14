@@ -22,7 +22,8 @@ public final class WidgetRenderer {
 
     private static final String TAG = "SaltteulWidget";
 
-    static final Class<?>[] PROVIDERS = {DashboardWidget.class, TodoWidget.class, TabletWidget.class};
+    static final Class<?>[] PROVIDERS = {DashboardWidget.class, TodoWidget.class, TabletWidget.class,
+            CalendarWidget.class, EssentialsWidget.class, QuickAddWidget.class};
 
     /** The tablet board splits into two columns from this width (dp). */
     static final float TWO_COLUMN_MIN_DP = 400f;
@@ -32,6 +33,9 @@ public final class WidgetRenderer {
     static String kindOf(Class<?> provider) {
         if (provider == TodoWidget.class) return WidgetLogic.KIND_TODO;
         if (provider == TabletWidget.class) return WidgetLogic.KIND_TABLET;
+        if (provider == CalendarWidget.class) return WidgetLogic.KIND_CALENDAR;
+        if (provider == EssentialsWidget.class) return WidgetLogic.KIND_ESSENTIALS;
+        if (provider == QuickAddWidget.class) return WidgetLogic.KIND_QUICK_ADD;
         return WidgetLogic.KIND_DASHBOARD;
     }
 
@@ -73,6 +77,7 @@ public final class WidgetRenderer {
                 Log.w(TAG, "render failed for " + kind, e);
             }
         }
+        if (!hasList(kind)) return;
         // notifyAppWidgetViewDataChanged is deprecated on API 35 but is the only way on API 24-34.
         m.notifyAppWidgetViewDataChanged(ids, R.id.widget_list);
         if (WidgetLogic.KIND_TABLET.equals(kind)) m.notifyAppWidgetViewDataChanged(ids, R.id.widget_list_right);
@@ -83,6 +88,9 @@ public final class WidgetRenderer {
      * current size itself (so turning the tablet switches it); older versions decide from the size it reports now.
      */
     static RemoteViews views(Context c, AppWidgetManager m, String kind, int id) {
+        if (WidgetLogic.KIND_CALENDAR.equals(kind)) return CalendarSetRenderer.calendar(c, m, id);
+        if (WidgetLogic.KIND_ESSENTIALS.equals(kind)) return CalendarSetRenderer.essentials(c);
+        if (WidgetLogic.KIND_QUICK_ADD.equals(kind)) return CalendarSetRenderer.quickAdd(c);
         if (!WidgetLogic.KIND_TABLET.equals(kind)) return build(c, kind, id, false);
         if (Build.VERSION.SDK_INT >= 31) {
             Map<SizeF, RemoteViews> bySize = new ArrayMap<>();
@@ -91,6 +99,12 @@ public final class WidgetRenderer {
             return new RemoteViews(bySize);
         }
         return build(c, kind, id, widthDp(c, m, id) >= TWO_COLUMN_MIN_DP);
+    }
+
+    /** The calendar, weather and quick-add widgets draw without a list. */
+    static boolean hasList(String kind) {
+        return WidgetLogic.KIND_DASHBOARD.equals(kind) || WidgetLogic.KIND_TODO.equals(kind)
+                || WidgetLogic.KIND_TABLET.equals(kind);
     }
 
     /** Current widget width: the max width in landscape, the min width in portrait (AppWidgetManager options). */
@@ -170,7 +184,7 @@ public final class WidgetRenderer {
         v.setPendingIntentTemplate(listId, toggleTemplate(c));
     }
 
-    private static void showMessage(Context c, RemoteViews v, int textRes) {
+    static void showMessage(Context c, RemoteViews v, int textRes) {
         v.setViewVisibility(R.id.widget_content, View.GONE);
         v.setViewVisibility(R.id.widget_message, View.VISIBLE);
         v.setTextViewText(R.id.widget_message, c.getString(textRes));
@@ -242,6 +256,20 @@ public final class WidgetRenderer {
         i.addCategory(Intent.CATEGORY_LAUNCHER);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         return PendingIntent.getActivity(c, 0, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /**
+     * Opens the app at a screen (design 2026-11-14 section 6): MainActivity hands OpenTargets.EXTRA_OPEN to the web page.
+     * The action is not MAIN, so a running app gets onNewIntent instead of only coming to the front, and each target
+     * has its own request code so the PendingIntents stay apart.
+     */
+    static PendingIntent openTarget(Context c, String target) {
+        Intent i = new Intent(c, MainActivity.class);
+        i.setAction(OpenTargets.ACTION_OPEN);
+        i.putExtra(OpenTargets.EXTRA_OPEN, target);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return PendingIntent.getActivity(c, OpenTargets.requestCode(target), i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     static PendingIntent toggleTemplate(Context c) {

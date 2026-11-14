@@ -17,4 +17,8 @@
     <color name="widget_owner_husband">#3E7B5C</color>
     <color name="widget_owner_wife">#E07A5F</color>
     <color name="widget_owner_both">#A7ADA6</color>
+    <!-- Calendar, weather and quick-add widgets (design 2026-11-14 2.1): a nearly opaque white card (94%) with a faint
+         shadow that stays light in dark mode. -->
+    <color name="widget_card_94">#F0FFFFFF</color>
+    <color name="widget_card_shadow">#0D232724</color>
 </resources>
