@@ -1,6 +1,7 @@
 // Writes android/app/src/main/res/values/saltteul_strings.xml from copy/ko.json.
 // Keys starting with "widget." plus app.name, weekday.*, owner.*, date.* become Android strings.
-// Name mapping: "widget.todayTitle" -> "widget_todayTitle". Placeholders {a} {b} -> %1$s %2$s in the order listed in the spec.
+// Name mapping: "widget.todayTitle" -> "widget_todayTitle". Placeholders {a} {b} -> %1$s %2$s in the order listed in the spec;
+// in those strings a literal % becomes %%.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
 const ko = JSON.parse(readFileSync('copy/ko.json', 'utf8'))
@@ -16,6 +17,8 @@ for (const [key, value] of Object.entries(ko).sort()) {
   if (!wanted(key)) continue
   const vars = varsByKey[key] ?? [...value.matchAll(/\{(\w+)\}/g)].map((m) => m[1])
   let v = esc(value)
+  // getString(id, args) formats the text, so a literal % ("비 {pop}%") must be %% there.
+  if (vars.length) v = v.replace(/%/g, '%%')
   vars.forEach((name, i) => { v = v.replaceAll(`{${name}}`, `%${i + 1}$s`) })
   const formatted = vars.length ? '' : ' formatted="false"'
   lines.push(`  <string name="${key.replace(/\./g, '_')}"${formatted}>${v}</string>`)
