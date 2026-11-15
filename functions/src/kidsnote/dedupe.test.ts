@@ -11,6 +11,11 @@ describe('similarTitles', () => {
     expect(similarTitles('[키즈노트] 가을 소풍', '[키즈노트] 소풍', P)).toBe(true)
     expect(similarTitles('[키즈노트] 학부모 상담 주간', '[키즈노트] 학부모상담', P)).toBe(true)
   })
+  it('treats 현장학습, 체험학습, 견학 and 소풍 as the same kind of outing', () => {
+    expect(similarTitles('[키즈노트] 별내 팜스쿨 현장학습', '[키즈노트] 별내 팜스쿨 견학', P)).toBe(true)
+    expect(similarTitles('[키즈노트] 현장체험학습: 홍유릉', '[키즈노트] 홍유릉 견학', P)).toBe(true)
+    expect(similarTitles('[키즈노트] 별내 팜스쿨 견학', '[키즈노트] 국립과천과학관 견학', P)).toBe(false)
+  })
   it('keeps different events apart', () => {
     expect(similarTitles('[키즈노트] 학부모 방문상담', '[키즈노트] 체육 활동', P)).toBe(false)
     expect(similarTitles('[키즈노트] 생일 파티', '[키즈노트] 할로윈 파티', P)).toBe(false)

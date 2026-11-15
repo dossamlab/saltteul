@@ -91,6 +91,8 @@ export const deadlineTitle = (title: string, t: T) =>
 function coreTitle(title: string, prefix: string): string {
   return norm(title.replace(prefix, ''))
     .replace(/[\[\]()·•.,:~!?'"-]/g, '')
+    // One outing announced twice: "팜스쿨 현장학습" in one notice, "팜스쿨 견학" in the next.
+    .replace(/현장체험학습|현장학습|체험학습|견학|나들이|소풍/g, '견학')
     .replace(/\d+학기|\d+차|\d+월|\d+일|가을|봄|여름|겨울/g, '')
 }
 
