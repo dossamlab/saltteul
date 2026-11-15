@@ -24,6 +24,18 @@ public class CalendarLogicTest {
         return out;
     }
 
+    @Test
+    public void events_dropTheKidsnotePrefixFromTitles() {
+        Snapshot.Todo kn = new Snapshot.Todo("k", "[키즈노트] 견학", "2026-11-06", null, "both", "kidsnote");
+        Snapshot.Todo own = new Snapshot.Todo("m", "[메모] 장보기", "2026-11-06", null, "wife", "manual");
+        List<Snapshot.Todo> list = new ArrayList<>();
+        list.add(kn);
+        list.add(own);
+        List<CalendarLogic.Event> ev = CalendarLogic.events(list, CalendarLogic.monthOf("2026-11-14"));
+        assertEquals("견학", ev.stream().filter(e -> e.id.equals("k")).findFirst().get().title);
+        assertEquals("[메모] 장보기", ev.stream().filter(e -> e.id.equals("m")).findFirst().get().title);
+    }
+
     // ---------- grid ----------
 
     @Test

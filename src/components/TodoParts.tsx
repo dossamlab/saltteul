@@ -1,6 +1,7 @@
 import { BellRing, CalendarCheck2, Plus, School, Sparkles, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { isMultiDay, normalizeRange } from '../../shared/todoDays'
+import { todoDisplayTitle } from '../../shared/todoTitle'
 import type { Owner, Todo } from '../../shared/types'
 import { t } from '../copy'
 import { addTodo, deleteTodo, sendNudge, toggleTodo, updateTodo, type TodoDraft } from '../data/actions'
@@ -27,10 +28,10 @@ export function TodoRow({ todo, onEdit, onNudge, tag }: { todo: Todo; onEdit: (t
   return (
     <div className="flex items-start gap-3 py-2.5">
       <div className="pt-0.5">
-        <Checkbox checked={todo.done} onChange={() => toggleTodo(h.hid, todo, h.uid)} label={todo.title} />
+        <Checkbox checked={todo.done} onChange={() => toggleTodo(h.hid, todo, h.uid)} label={todoDisplayTitle(todo)} />
       </div>
       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onEdit(todo)}>
-        <p className={`text-[15px] leading-snug ${todo.done ? 'done-text' : 'text-ink'}`}>{todo.title}</p>
+        <p className={`text-[15px] leading-snug ${todo.done ? 'done-text' : 'text-ink'}`}>{todoDisplayTitle(todo)}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2">
           {isMultiDay(todo) && <span>{rangeLabel(todo.date!, todo.endDate!)}</span>}
           {todo.time && <span>{timeRangeLabel(todo.time, todo.endTime)}</span>}

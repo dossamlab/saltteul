@@ -87,7 +87,7 @@ public final class CalendarLogic {
 
         Event(Snapshot.Todo t, String end) {
             this.id = t.id;
-            this.title = t.title;
+            this.title = WidgetLogic.displayTitle(t.title, t.source);
             this.owner = t.owner;
             this.time = t.time;
             this.start = t.date.substring(0, 10);

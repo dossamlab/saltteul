@@ -4,6 +4,7 @@ import { addDays, weekdayOf } from '../../shared/householdDate'
 import { addMonths, isMonthPlan, monthGrid, monthNumber, monthOf, weekStart, type Ym } from '../../shared/monthPlan'
 import { isRoutineDone, routinesForDay } from '../../shared/routines'
 import { layoutWeek, occursOn } from '../../shared/todoDays'
+import { todoDisplayTitle } from '../../shared/todoTitle'
 import type { Owner, Todo, Ymd } from '../../shared/types'
 import { MonthPlanCard } from '../components/MonthPlan'
 import { ChoreList, RoutineChecklist } from '../components/RoutineParts'
@@ -139,7 +140,7 @@ function MonthGrid({ ym, selected, onSelect, detailed }: { ym: Ym; selected: Ymd
                   className={`pointer-events-none z-[1] my-px flex min-w-0 items-center overflow-hidden px-1 font-semibold leading-none ${
                     detailed ? 'text-[11px]' : 'text-[10px]'} ${OWNER_BAR[b.todo.owner] ?? OWNER_BAR.both} ${b.todo.done ? 'opacity-40' : ''} ${
                     b.fromBefore ? 'ml-0 rounded-l-none' : 'ml-[2px] rounded-l-[4px]'} ${b.toAfter ? 'mr-0 rounded-r-none' : 'mr-[2px] rounded-r-[4px]'}`}>
-                  <span className="truncate">{detailed && b.todo.time && !b.fromBefore ? `${b.todo.time} ` : ''}{b.todo.title}</span>
+                  <span className="truncate">{detailed && b.todo.time && !b.fromBefore ? `${b.todo.time} ` : ''}{todoDisplayTitle(b.todo)}</span>
                 </span>
               ))}
               {more.map((n, i) => n > 0 && (

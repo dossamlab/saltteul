@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { togetherDays, upcoming } from '../../shared/anniversaries'
 import { seoulDate, seoulTime } from '../../shared/householdDate'
 import { todoLastDay } from '../../shared/todoDays'
+import { todoDisplayTitle } from '../../shared/todoTitle'
 import type { Briefing, WeatherDay } from '../../shared/types'
 import { t } from '../copy'
 import { refreshWeather, undoKidsnoteBatch } from '../data/actions'
@@ -272,7 +273,7 @@ export function KidsnoteCard({ className = '' }: { className?: string }) {
         <div key={x.id} className="py-2">
           <div className="flex items-baseline gap-2">
             <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-[12px] font-semibold text-wisteria">{relativeDay(x.date!, h.today)}</span>
-            <span className="text-[15px]">{x.title.replace(t('kidsnote.eventPrefix'), '').trim()}</span>
+            <span className="text-[15px]">{todoDisplayTitle(x)}</span>
           </div>
           {!!x.prepItems?.length && (
             <div className="mt-1 flex flex-wrap gap-1 pl-[96px]">
